@@ -531,7 +531,7 @@ export async function generateCraftIDReport(craftData: CraftData) {
           },
         ],
       },
-      
+
       // VERIFICATION SECTION AT BOTTOM
       {
         canvas: [
