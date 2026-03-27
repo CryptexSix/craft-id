@@ -12,7 +12,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
   useEffect(() => {
     if (loading) return;
     if (!user) {
-      router.replace("/");
+      router.replace("/login");
     }
   }, [loading, user, router]);
 

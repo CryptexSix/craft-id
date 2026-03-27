@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronLeft, Info, UserCircle2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useMemo, useState } from "react";
+import { getAppOrigin } from "@/lib/utils";
 
 const states = ["Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"];
 const skills = ["✂️ Tailor", "🔧 Mechanic", "🪑 Carpenter", "⚡ Welder", "💇 Hairdresser", "🪠 Plumber", "🧱 Tiler", "🎨 Painter", "➕ Other"];
@@ -121,10 +122,10 @@ export default function OnboardingPage() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [fullPaymentUrl, setFullPaymentUrl] = useState("");
   const [copied, setCopied] = useState(false);
-  const [form, setForm] = useState({ fullName: "", phone: "", state: "", skill: "✂️ Tailor", otherSkill: "", experience: 6, minJob: "", avgJob: "", premiumJob: "", bio: "" });
+  const [form, setForm] = useState({ fullName: "", email: "", phone: "", state: "", skill: "✂️ Tailor", otherSkill: "", experience: 6, minJob: "", avgJob: "", premiumJob: "", bio: "" });
 
   const valid = useMemo(() => {
-    if (step === 1) return !!(form.fullName && form.phone && form.state);
+    if (step === 1) return !!(form.fullName && form.email && form.state);
     if (step === 2) return !!form.skill && (form.skill !== "➕ Other" || !!form.otherSkill.trim());
     if (step === 3) return !!(form.minJob && form.avgJob);
     return false;
@@ -135,9 +136,10 @@ export default function OnboardingPage() {
   const slug = (form.fullName || "artisan").toLowerCase().replace(/\s+/g, "-");
   const resolvedPaymentUrl =
     fullPaymentUrl ||
-    (typeof window !== "undefined"
-      ? `${window.location.origin}/pay/${slug}`
-      : `https://craftid.ng/pay/${slug}`);
+    (() => {
+      const origin = getAppOrigin();
+      return origin ? `${origin}/pay/${slug}` : `/pay/${slug}`;
+    })();
 
   const formatMoney = (v: string) => v.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
@@ -176,14 +178,16 @@ export default function OnboardingPage() {
 
     const generatedSlug = (form.fullName || "artisan").toLowerCase().replace(/\s+/g, "-");
     const generatedPaymentLink = `/pay/${generatedSlug}`;
-    const generatedFullPaymentUrl = `${window.location.origin}${generatedPaymentLink}`;
+    const origin = getAppOrigin();
+    const generatedFullPaymentUrl = origin ? `${origin}${generatedPaymentLink}` : generatedPaymentLink;
 
     const resolvedSkill = form.skill === "➕ Other" ? form.otherSkill.trim() : form.skill;
 
     const userProfile = {
       firstName: form.fullName.split(" ")[0],
       fullName: form.fullName,
-      phone: form.phone,
+      email: form.email.trim().toLowerCase(),
+      phone: "",
       state: form.state,
       skill: resolvedSkill,
       experience: form.experience,
@@ -247,7 +251,7 @@ export default function OnboardingPage() {
 
             <AnimatePresence mode="wait">
               <motion.div key={step} initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} transition={{ duration: 0.25 }}>
-                {step === 1 && <div><UserCircle2 size={48} style={{ color: "var(--orange)", marginBottom: 14 }} /><h1 style={{ fontFamily: "var(--font-syne)", fontSize: 32, fontWeight: 700 }}>Who are you?</h1><p style={{ color: "var(--text-2)", marginTop: 6 }}>Let&apos;s set up your professional identity</p><div className="mt-7 space-y-4">{[["Full name", "fullName", "Emeka Okafor"], ["Phone", "phone", "0812 345 6789"]].map(([label, key, placeholder]) => <div key={key}><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>{label}</label><input className="w-full rounded-xl px-4 py-3.5" value={form[key as keyof typeof form] as string} placeholder={placeholder} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} /></div>)}<div><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>State</label><select className="w-full rounded-xl px-4 py-3.5" value={form.state} onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}><option value="">Select your state</option>{states.map((s) => <option key={s}>{s}</option>)}</select></div></div></div>}
+                {step === 1 && <div><UserCircle2 size={48} style={{ color: "var(--orange)", marginBottom: 14 }} /><h1 style={{ fontFamily: "var(--font-syne)", fontSize: 32, fontWeight: 700 }}>Who are you?</h1><p style={{ color: "var(--text-2)", marginTop: 6 }}>Let&apos;s set up your professional identity</p><div className="mt-7 space-y-4">{[["Full name", "fullName", "Emeka Okafor"], ["Email", "email", "emeka@example.com"]].map(([label, key, placeholder]) => <div key={key}><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>{label}</label><input className="w-full rounded-xl px-4 py-3.5" value={form[key as keyof typeof form] as string} placeholder={placeholder} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} /></div>)}<div><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>State</label><select className="w-full rounded-xl px-4 py-3.5" value={form.state} onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}><option value="">Select your state</option>{states.map((s) => <option key={s}>{s}</option>)}</select></div></div></div>}
 
                 {step === 2 && <div><h1 style={{ fontFamily: "var(--font-syne)", fontSize: 32, fontWeight: 700 }}>What&apos;s your craft?</h1><p style={{ color: "var(--text-2)", marginTop: 6 }}>Choose your primary skill</p><div className="mt-7 grid grid-cols-3 gap-3">{skills.map((skill) => { const active = form.skill === skill; const [emoji, ...rest] = skill.split(" "); return <button key={skill} onClick={() => setForm((f) => ({ ...f, skill }))} className="flex flex-col items-center gap-2 rounded-2xl px-2 py-4" style={{ background: active ? "var(--orange-dim)" : "var(--surface)", border: `1px solid ${active ? "var(--orange)" : "var(--border)"}`, boxShadow: active ? "0 0 0 3px var(--orange-dim)" : "none" }}><span style={{ fontSize: 28 }}>{emoji}</span><span style={{ color: active ? "var(--orange)" : "var(--text-2)", fontSize: 12 }}>{rest.join(" ")}</span>{active ? <span className="h-2 w-2 rounded-full" style={{ background: "var(--orange)" }} /> : null}</button>; })}</div>{form.skill === "➕ Other" ? (<div className="mt-5"><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>Your craft</label><input className="w-full rounded-xl px-4 py-3.5" value={form.otherSkill} placeholder="e.g. Electrician" onChange={(e) => setForm((f) => ({ ...f, otherSkill: e.target.value }))} /></div>) : null}<div className="mt-6"><label style={{ color: "var(--text-2)", fontSize: 14 }}>Years of experience</label><div className="mt-2 grid grid-cols-2 gap-3"><select className="w-full rounded-xl px-4 py-3.5" value={String(form.experience)} onChange={(e) => setForm((f) => ({ ...f, experience: Number(e.target.value) }))}><option value="">Select</option>{Array.from({ length: 25 }, (_, i) => i + 1).map((y) => <option key={y} value={y}>{y} year{y === 1 ? "" : "s"}</option>)}</select><input type="number" min={0} max={60} className="w-full rounded-xl px-4 py-3.5" value={String(form.experience)} onChange={(e) => { const next = Number(e.target.value); setForm((f) => ({ ...f, experience: Number.isFinite(next) ? next : 0 })); }} /></div><p className="mt-2 text-xs" style={{ color: "var(--text-2)" }}>Use the dropdown or type a number.</p></div></div>}
 

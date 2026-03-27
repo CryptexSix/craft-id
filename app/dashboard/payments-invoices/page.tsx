@@ -5,7 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 
 import { StatsCard } from "@/components/stats-card";
 import { useUser } from "@/lib/useUser";
-import { formatNaira } from "@/lib/utils";
+import { formatNaira, getAppOrigin } from "@/lib/utils";
 
 type DbInvoice = {
     id: string;
@@ -153,10 +153,7 @@ export default function PaymentsInvoicesPage() {
     const invoicesTotal = useMemo(() => invoices.reduce((sum, inv) => sum + (inv.amount_kobo || 0), 0), [invoices]);
     const paymentsTotal = useMemo(() => payments.reduce((sum, p) => sum + (p.amount_kobo || 0), 0), [payments]);
 
-    const origin = useMemo(() => {
-        if (typeof window === "undefined") return "";
-        return window.location.origin;
-    }, []);
+    const origin = useMemo(() => getAppOrigin(), []);
 
     return (
         <div className="space-y-8">
@@ -244,7 +241,7 @@ export default function PaymentsInvoicesPage() {
                                                 style={{ borderColor: "var(--border)" }}
                                             >
                                                 <QRCodeSVG
-                                                    value={origin ? `${origin}/pay/${artisanSlug}/${inv.reference}` : `https://craftid.ng/pay/${artisanSlug}/${inv.reference}`}
+                                                    value={origin ? `${origin}/pay/${artisanSlug}/${inv.reference}` : `/pay/${artisanSlug}/${inv.reference}`}
                                                     size={72}
                                                     fgColor="#09090E"
                                                     bgColor="#FFFFFF"

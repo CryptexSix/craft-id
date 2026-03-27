@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@/lib/useUser";
 import { formatNaira } from "@/lib/utils";
 import { generateCraftIDReport, type CraftData } from "@/lib/reports/craftid-report";
-import { ReportSidebar } from "@/app/loan/components/report-sidebar";
+import { ReportSidebar } from "@/app/report/components/report-sidebar";
 
 type DbPayment = {
     txn_ref: string;
@@ -34,10 +34,12 @@ function toISODate(d: Date) {
     return `${yyyy}-${mm}-${dd}`;
 }
 
-export default function LoanReportPage() {
+export default function ReportPage() {
     const router = useRouter();
     const { user, loading: userLoading } = useUser();
     const slug = (user?.slug ?? "").toLowerCase();
+
+    const [bvnVerified, setBvnVerified] = useState(false);
 
     const [payments, setPayments] = useState<DbPayment[]>([]);
     const [loadingPayments, setLoadingPayments] = useState(true);
@@ -45,7 +47,18 @@ export default function LoanReportPage() {
 
     const [craftScore850, setCraftScore850] = useState<number>(0);
     const [loadingScore, setLoadingScore] = useState(true);
-    const [bvnVerified, setBvnVerified] = useState(false);
+
+    useEffect(() => {
+        if (userLoading) return;
+        const localBVN = (() => {
+            try {
+                return localStorage.getItem("craftid_bvn_verified") === "true";
+            } catch {
+                return false;
+            }
+        })();
+        setBvnVerified(Boolean(user?.bvnVerified) || localBVN);
+    }, [user?.bvnVerified, userLoading]);
 
     useEffect(() => {
         const load = async () => {
@@ -81,26 +94,16 @@ export default function LoanReportPage() {
             setLoadingScore(true);
             try {
                 if (!user?.createdAt) return;
+                if (loadingPayments) return;
                 const created = new Date(user.createdAt);
                 const accountAgeDays = Number.isNaN(created.getTime())
                     ? 0
                     : Math.max(0, Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
-                const savedTransactions = (() => {
-                    try {
-                        return JSON.parse(localStorage.getItem("craftid_transactions") || "[]");
-                    } catch {
-                        return [];
-                    }
-                })();
-
-                const txCount = Array.isArray(savedTransactions) ? savedTransactions.length : 0;
-                const totalVolume = Array.isArray(savedTransactions)
-                    ? savedTransactions.reduce((sum: number, t: any) => sum + (Number(t?.amount) || 0), 0)
-                    : 0;
+                const txCount = payments.length;
+                const totalVolume = payments.reduce((sum, p) => sum + (Number(p?.amount_kobo || 0) / 100), 0);
 
                 const bvnStatus = user?.bvnVerified === true || localStorage.getItem("craftid_bvn_verified") === "true";
-                setBvnVerified(bvnStatus);
 
                 const scoreRes = await fetch("/api/craft-score", {
                     method: "POST",
@@ -116,30 +119,20 @@ export default function LoanReportPage() {
                 setCraftScore850(Number(scoreJson?.score) || 0);
             } catch {
                 setCraftScore850(0);
-                setBvnVerified(false);
             } finally {
                 setLoadingScore(false);
             }
         };
 
         if (!userLoading) void loadScore();
-    }, [userLoading, user?.createdAt]);
+    }, [loadingPayments, payments, userLoading, user?.createdAt, user?.bvnVerified]);
 
-    // Redirect if not qualified for loans (same gate as /loan)
     useEffect(() => {
         if (userLoading) return;
         if (!user) {
-            router.replace("/loan");
-            return;
+            router.replace("/dashboard");
         }
-        if (loadingScore) return;
-
-        const isEligibleByScore = craftScore850 >= 350;
-        const isQualified = isEligibleByScore && bvnVerified;
-        if (!isQualified) {
-            router.replace("/loan");
-        }
-    }, [bvnVerified, craftScore850, loadingScore, router, user, userLoading]);
+    }, [router, user, userLoading]);
 
     const craftData: CraftData | null = useMemo(() => {
         if (!user) return null;
@@ -205,13 +198,13 @@ export default function LoanReportPage() {
         };
     }, [payments, user, craftScore850]);
 
-    const canDownload = Boolean(craftData) && !loadingPayments && !loadingScore;
+    const canDownload = Boolean(craftData) && !loadingPayments && !loadingScore && bvnVerified;
 
     return (
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
             <div className="mx-auto w-full max-w-5xl">
-                <a href="/loan" className="inline-flex items-center gap-2 text-sm" style={{ color: "var(--text-2)" }}>
-                    <ArrowLeft size={16} /> Back to loan
+                <a href="/dashboard" className="inline-flex items-center gap-2 text-sm" style={{ color: "var(--text-2)" }}>
+                    <ArrowLeft size={16} /> Back to dashboard
                 </a>
 
                 <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
@@ -227,6 +220,10 @@ export default function LoanReportPage() {
                         disabled={!canDownload}
                         onClick={async () => {
                             if (!craftData) return;
+                            if (!bvnVerified) {
+                                setError("BVN must be verified before generating this report.");
+                                return;
+                            }
                             try {
                                 await generateCraftIDReport(craftData);
                             } catch (e: any) {
@@ -239,6 +236,17 @@ export default function LoanReportPage() {
                         <FileDown size={16} /> Download PDF
                     </button>
                 </div>
+
+                {!bvnVerified ? (
+                    <div className="mt-3 rounded-xl border px-4 py-3 text-sm" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
+                        <p style={{ color: "var(--text-2)" }}>
+                            BVN verification is required before you can generate or download this report.
+                        </p>
+                        <a href="/score" className="mt-2 inline-flex" style={{ color: "var(--orange)", fontWeight: 700 }}>
+                            Verify BVN on Score Page →
+                        </a>
+                    </div>
+                ) : null}
 
                 <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-5">
                     <div className="rounded-xl border p-6 lg:col-span-3" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>

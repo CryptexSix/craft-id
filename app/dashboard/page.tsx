@@ -8,7 +8,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { CraftScoreGauge } from "@/components/craft-score-gauge";
 import { PaymentLinkCard } from "@/components/payment-link-card";
 import { StatsCard } from "@/components/stats-card";
-import { formatNaira } from "@/lib/utils";
+import { formatNaira, getAppOrigin } from "@/lib/utils";
 import { useUser } from "@/lib/useUser";
 
 interface Transaction {
@@ -274,7 +274,8 @@ export default function DashboardPage() {
       if (!ref) throw new Error("Invoice created but missing reference");
 
       const payPath = `/pay/${encodeURIComponent(user.slug.toLowerCase())}/${encodeURIComponent(ref)}`;
-      const payLink = typeof window !== "undefined" ? `${window.location.origin}${payPath}` : `https://craftid.ng${payPath}`;
+      const origin = getAppOrigin();
+      const payLink = origin ? `${origin}${payPath}` : payPath;
 
       setGeneratedInvoice({
         id: ref,
@@ -367,7 +368,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-5">
-        <div className="rounded-xl border p-6 lg:col-span-3" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+        <div className="rounded-xl border p-6 lg:col-span-5" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
           <div className="mb-4 flex items-center justify-between"><h3 style={{ fontFamily: "var(--font-syne)", fontWeight: 700, fontSize: 20 }}>CraftScore</h3><a href="/score" style={{ color: "var(--orange)", fontSize: 13 }}>Full Report →</a></div>
           <p style={{ color: "var(--text-2)", fontSize: 12 }}>
             {stats.count === 0
@@ -392,18 +393,6 @@ export default function DashboardPage() {
               <div className="h-1.5 overflow-hidden rounded-full" style={{ background: "var(--border)" }}><div className="h-full rounded-full" style={{ width: `${hasPayments ? (accountConsistencyPoints / 200) * 100 : 0}%`, background: "linear-gradient(90deg,var(--orange),var(--purple))" }} /></div>
             </div>
           </div>
-        </div>
-
-        <div className="relative rounded-xl border p-6 lg:col-span-2" style={{ background: "linear-gradient(135deg, rgba(249,115,22,0.06), var(--surface))", borderColor: "rgba(249,115,22,0.25)" }}>
-          <div className="pointer-events-none absolute -right-8 -top-6 h-28 w-28 rounded-full" style={{ background: "radial-gradient(circle, rgba(249,115,22,0.25), transparent 70%)" }} />
-          <span className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs" style={{ background: "var(--orange-dim)", borderColor: "rgba(249,115,22,0.2)", color: "var(--orange)" }}>{craftScore >= 350 ? "✓ Pre-Approved" : "🔒 Locked"}</span>
-          <p className="mt-3" style={{ fontFamily: "var(--font-syne)", fontSize: "clamp(32px,9vw,44px)", fontWeight: 800 }}>{formatNaira(craftScore >= 350 ? (craftScore >= 650 ? 1000000 : craftScore >= 500 ? 500000 : 150000) : 0)}</p>
-          <p style={{ color: "var(--text-2)", fontSize: 14 }}>Equipment Loan</p>
-          <p className="mt-1" style={{ color: "var(--text-2)", fontSize: 13 }}>{craftScore >= 350 ? "6 months · 3.5%/month" : "Reach 350+ score to unlock"}</p>
-          {craftScore >= 350 && <p className="mt-2" style={{ color: "var(--yellow)", fontSize: 12 }}>⏳ Offer expires in 30 days</p>}
-          <a href="/loan" className={`mt-6 inline-flex w-full items-center justify-center rounded-xl px-4 py-3 ${craftScore >= 350 ? "" : "opacity-50 cursor-not-allowed"}`} style={{ background: craftScore >= 350 ? "var(--orange)" : "var(--surface)", color: craftScore >= 350 ? "white" : "var(--text-3)", fontFamily: "var(--font-syne)", fontWeight: 700 }}>
-            {craftScore >= 350 ? "Claim Offer →" : "Build Score to Unlock"}
-          </a>
         </div>
       </div>
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BarChart3, CreditCard, Home, Repeat2, Sparkles, Users, Wallet } from "lucide-react";
+import { BarChart3, Home, Repeat2, Sparkles, Users, Wallet } from "lucide-react";
 
 const dashboardMenu = [
   {
@@ -25,9 +25,9 @@ const dashboardMenu = [
     icon: Sparkles,
   },
   {
-    label: "Loans",
-    href: "/loan",
-    description: "Capital offers",
+    label: "Report",
+    href: "/report",
+    description: "Income report",
     icon: Wallet,
   },
   {
@@ -41,12 +41,6 @@ const dashboardMenu = [
     href: "/dashboard#clients",
     description: "Local leads",
     icon: Users,
-  },
-  {
-    label: "My Card",
-    href: "/card",
-    description: "Virtual wallet",
-    icon: CreditCard,
   },
 ];
 

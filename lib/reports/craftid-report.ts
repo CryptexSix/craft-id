@@ -1,5 +1,7 @@
 "use client";
 
+import { getAppOrigin } from "@/lib/utils";
+
 export type CraftData = {
   name: string;
   skill: string;
@@ -55,62 +57,78 @@ function scoreLabel(score: number) {
 function scoreBar(score: number) {
   const blocks = 12;
   const filled = Math.round((clamp(score, 0, 100) / 100) * blocks);
-  return "█".repeat(filled) + "░".repeat(blocks - filled);
+  return "=".repeat(filled) + "-".repeat(blocks - filled);
 }
 
-type PdfMakeModule = {
-  createPdf: (docDefinition: any) => {
-    download: (fileName: string) => void;
-  };
-  vfs?: Record<string, string>;
-  fonts?: Record<
-    string,
-    { normal: string; bold: string; italics: string; bolditalics: string }
-  >;
-};
-
 export async function generateCraftIDReport(craftData: CraftData) {
-  const [pdfMakeMod, vfsFontsMod] = await Promise.all([
-    import("pdfmake/build/pdfmake"),
-    import("pdfmake/build/vfs_fonts"),
-  ]);
+  // Dynamic imports for better browser compatibility
+  const pdfMakeMod = await import("pdfmake/build/pdfmake");
+  const vfsFontsMod = await import("pdfmake/build/vfs_fonts");
 
-  const pdf = ((pdfMakeMod as any)?.default ?? pdfMakeMod) as PdfMakeModule;
+  const pdfMake = ((pdfMakeMod as any)?.default ?? pdfMakeMod) as any;
 
+  // Extract VFS from the fonts module (shape varies by bundler)
   const vfs =
     (vfsFontsMod as any)?.pdfMake?.vfs ??
     (vfsFontsMod as any)?.default?.pdfMake?.vfs ??
     (vfsFontsMod as any)?.vfs ??
-    (vfsFontsMod as any)?.default?.vfs;
+    (vfsFontsMod as any)?.default?.vfs ??
+    (vfsFontsMod as any)?.default ??
+    (vfsFontsMod as any);
 
-  if (vfs) {
-    pdf.vfs = vfs;
+  // Assign VFS to pdfMake
+  if (vfs && typeof vfs === "object" && vfs["Roboto-Regular.ttf"]) {
+    pdfMake.vfs = vfs;
   }
 
-  // Ensure pdfmake knows how to resolve the default font family.
-  // Without this, bold text often looks for Roboto-Medium.ttf and can crash if fonts weren't attached.
-  pdf.fonts = {
-    Roboto: {
-      normal: "Roboto-Regular.ttf",
-      bold: "Roboto-Medium.ttf",
-      italics: "Roboto-Italic.ttf",
-      bolditalics: "Roboto-MediumItalic.ttf",
-    },
+  // Configure Roboto font family - fall back to Regular if Medium variants unavailable
+  const hasFullRoboto =
+    pdfMake.vfs &&
+    pdfMake.vfs["Roboto-Regular.ttf"] &&
+    pdfMake.vfs["Roboto-Medium.ttf"] &&
+    pdfMake.vfs["Roboto-Italic.ttf"] &&
+    pdfMake.vfs["Roboto-MediumItalic.ttf"];
+
+  pdfMake.fonts = {
+    Roboto: hasFullRoboto
+      ? {
+          normal: "Roboto-Regular.ttf",
+          bold: "Roboto-Medium.ttf",
+          italics: "Roboto-Italic.ttf",
+          bolditalics: "Roboto-MediumItalic.ttf",
+        }
+      : {
+          // Fallback: use Regular for all variants if Medium not available
+          normal: "Roboto-Regular.ttf",
+          bold: "Roboto-Regular.ttf",
+          italics: "Roboto-Regular.ttf",
+          bolditalics: "Roboto-Regular.ttf",
+        },
   };
 
-  if (
-    !pdf.vfs ||
-    !pdf.vfs["Roboto-Regular.ttf"] ||
-    !pdf.vfs["Roboto-Medium.ttf"]
-  ) {
+  if (!pdfMake.vfs || !pdfMake.vfs["Roboto-Regular.ttf"]) {
     throw new Error(
       "PDF fonts failed to load. Please refresh and try again (Roboto vfs missing).",
     );
   }
 
   const generated = new Date();
-  const reportId = `CID-2026-${craftData.craftIdNumber}`;
-  const verifyUrl = `https://craftid.ng/verify/${craftData.craftIdNumber}`;
+  const reportId = `CID-2026-${craftData.craftIdNumber}-${String(Date.now()).slice(-4)}`;
+  const origin = getAppOrigin();
+  const verifyUrl = origin
+    ? `${origin}/verify/${craftData.craftIdNumber}`
+    : `/verify/${craftData.craftIdNumber}`;
+
+  let qrDataUrl: string | null = null;
+  try {
+    const qrcodeMod = await import("qrcode");
+    const QRCode = ((qrcodeMod as any)?.default ?? qrcodeMod) as any;
+    if (QRCode?.toDataURL) {
+      qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 240 });
+    }
+  } catch {
+    qrDataUrl = null;
+  }
 
   const identityRows = [
     ["Full Name", craftData.name],
@@ -235,14 +253,21 @@ export async function generateCraftIDReport(craftData: CraftData) {
               widths: ["*"] as any,
               body: [
                 [
-                  {
-                    text: "[QR CODE]",
-                    alignment: "center",
-                    fontSize: 9,
-                    bold: true,
-                    color: PRIMARY,
-                    margin: [0, 18, 0, 18],
-                  },
+                  qrDataUrl
+                    ? {
+                        image: qrDataUrl,
+                        alignment: "center",
+                        fit: [90, 90],
+                        margin: [0, 6, 0, 6],
+                      }
+                    : {
+                        text: "QR unavailable",
+                        alignment: "center",
+                        fontSize: 9,
+                        bold: true,
+                        color: PRIMARY,
+                        margin: [0, 18, 0, 18],
+                      },
                 ],
               ],
             },
@@ -506,6 +531,87 @@ export async function generateCraftIDReport(craftData: CraftData) {
           },
         ],
       },
+      
+      // VERIFICATION SECTION AT BOTTOM
+      {
+        canvas: [
+          {
+            type: "line",
+            x1: 0,
+            y1: 12,
+            x2: 515,
+            y2: 12,
+            lineWidth: 1,
+            lineColor: "#D7D7D7",
+          },
+        ],
+        margin: [0, 20, 0, 14],
+      },
+      {
+        table: {
+          widths: ["*"] as any,
+          body: [
+            [
+              {
+                text: "DOCUMENT VERIFICATION",
+                fillColor: SECTION_BG,
+                color: PRIMARY,
+                bold: true,
+                fontSize: 10,
+                margin: [8, 6, 8, 6],
+              },
+            ],
+          ],
+        },
+        layout: "noBorders",
+      },
+      {
+        columns: [
+          {
+            width: "*",
+            stack: [
+              {
+                text: "Verification Link:",
+                fontSize: 9,
+                bold: true,
+                color: PRIMARY,
+                margin: [0, 0, 0, 4],
+              },
+              {
+                text: verifyUrl,
+                fontSize: 8,
+                color: "#0079BE",
+                margin: [0, 0, 0, 10],
+              },
+              {
+                text: "Banks and lenders can use this link or scan the QR code below to verify this report.",
+                fontSize: 8,
+                italics: true,
+                color: PRIMARY,
+                lineHeight: 1.3,
+              },
+            ],
+          },
+          {
+            width: 100,
+            stack: [
+              qrDataUrl
+                ? {
+                    image: qrDataUrl,
+                    alignment: "center",
+                    fit: [90, 90],
+                  }
+                : {
+                    text: "QR Code",
+                    alignment: "center",
+                    fontSize: 10,
+                    color: PRIMARY,
+                    margin: [0, 30, 0, 30],
+                  },
+            ],
+          },
+        ],
+      },
     ],
     defaultStyle: {
       font: "Roboto",
@@ -513,5 +619,5 @@ export async function generateCraftIDReport(craftData: CraftData) {
   };
 
   const fileName = `CraftID-Report-${craftData.craftIdNumber}.pdf`;
-  pdf.createPdf(docDefinition).download(fileName);
+  pdfMake.createPdf(docDefinition).download(fileName);
 }

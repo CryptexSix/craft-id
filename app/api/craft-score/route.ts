@@ -43,15 +43,6 @@ function getScoreLevel(score: number): string {
   return "Building";
 }
 
-function getUnlocks(score: number) {
-  return {
-    virtualCard: score >= 200,
-    nanoLoan: score >= 350,
-    businessAccount: score >= 500,
-    premiumLending: score >= 650,
-  };
-}
-
 export async function POST(req: NextRequest) {
   try {
     const {
@@ -71,7 +62,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       score,
       level: getScoreLevel(score),
-      unlocks: getUnlocks(score),
     });
   } catch (err) {
     console.error("[CraftID] CraftScore error:", err);

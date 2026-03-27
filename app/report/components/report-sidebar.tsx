@@ -1,9 +1,14 @@
 "use client";
 
 import { Shield } from "lucide-react";
+import { QRCodeCanvas } from "qrcode.react";
+import { getAppOrigin } from "@/lib/utils";
 
 export function ReportSidebar({ craftIdNumber }: { craftIdNumber: string }) {
-    const verifyUrl = craftIdNumber ? `https://craftid.ng/verify/${encodeURIComponent(craftIdNumber)}` : "https://craftid.ng";
+    const origin = getAppOrigin();
+    const verifyUrl = craftIdNumber
+        ? `${origin || ""}/verify/${encodeURIComponent(craftIdNumber)}`
+        : origin || "/";
 
     return (
         <aside className="space-y-3">
@@ -34,12 +39,8 @@ export function ReportSidebar({ craftIdNumber }: { craftIdNumber: string }) {
                     className="mt-3 grid place-items-center rounded-lg border"
                     style={{ borderColor: "var(--border)", background: "var(--surface-2)", height: 120 }}
                 >
-                    <p style={{ fontFamily: "var(--font-dm-mono)", fontSize: 12, color: "var(--text-2)" }}>[QR CODE]</p>
+                    <QRCodeCanvas value={verifyUrl} size={96} includeMargin level="M" />
                 </div>
-
-                <p className="mt-3 text-xs" style={{ color: "var(--text-3)" }}>
-                    QR generation will be enabled next.
-                </p>
             </div>
         </aside>
     );
