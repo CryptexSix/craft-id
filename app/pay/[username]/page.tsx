@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, ChevronDown, ChevronUp, MapPin, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatNaira } from "@/lib/utils";
@@ -19,6 +19,17 @@ type StoredTransaction = {
   clientName: string;
   artisanName: string;
   timestamp: string;
+};
+
+const resolveCheckoutMode = () => {
+  const rawMode = process.env.NEXT_PUBLIC_ISW_MODE || "TEST";
+  return rawMode.trim().toUpperCase() === "LIVE" ? "LIVE" : "TEST";
+};
+
+const resolveCheckoutScriptUrl = (mode: "TEST" | "LIVE") => {
+  return mode === "LIVE"
+    ? "https://newwebpay.interswitchng.com/inline-checkout.js"
+    : "https://newwebpay.qa.interswitchng.com/inline-checkout.js";
 };
 
 const parseJsonSafe = <T,>(value: string | null): T | null => {
@@ -44,9 +55,14 @@ export default function PublicPayPage() {
   const [paidAmount, setPaidAmount] = useState(0);
   const [checkoutReady, setCheckoutReady] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentDebug, setPaymentDebug] = useState<string[]>([]);
   const [profileLoading, setProfileLoading] = useState(true);
   const [artisanProfile, setArtisanProfile] = useState<UserProfile | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<StoredTransaction[]>([]);
+  const checkoutWatchdogRef = useRef<number | null>(null);
+
+  const checkoutMode = resolveCheckoutMode();
+  const checkoutScriptUrl = resolveCheckoutScriptUrl(checkoutMode);
 
   const parsedAmount = useMemo(() => Number(amount.replace(/,/g, "") || 0), [amount]);
 
@@ -123,7 +139,7 @@ export default function PublicPayPage() {
 
     if (!existingScript) {
       const script = document.createElement("script");
-      script.src = "https://newwebpay.qa.interswitchng.com/inline-checkout.js";
+      script.src = checkoutScriptUrl;
       script.async = true;
       script.setAttribute("data-craftid", "interswitch-checkout");
       script.onload = setReady;
@@ -142,7 +158,7 @@ export default function PublicPayPage() {
     }, 250);
 
     return () => window.clearInterval(timer);
-  }, []);
+  }, [checkoutScriptUrl]);
 
   const fallbackName = (username || "artisan")
     .split("-")
@@ -172,6 +188,7 @@ export default function PublicPayPage() {
   const handlePay = async () => {
     if (!parsedAmount) return;
     setPaymentError(null);
+    setPaymentDebug([]);
 
     if (
       !process.env.NEXT_PUBLIC_ISW_MERCHANT_CODE ||
@@ -189,70 +206,132 @@ export default function PublicPayPage() {
 
     setLoading(true);
 
+    if (checkoutWatchdogRef.current) {
+      window.clearTimeout(checkoutWatchdogRef.current);
+      checkoutWatchdogRef.current = null;
+    }
+
     const amountInKobo = parsedAmount * 100;
     const txnRef = `craftid_${username}_${Date.now()}`;
+    const redirectUrl = `https://craftid.ng/pay/${username}`;
+
+    const checkoutConfig: Record<string, unknown> = {
+      merchant_code: process.env.NEXT_PUBLIC_ISW_MERCHANT_CODE,
+      pay_item_id: process.env.NEXT_PUBLIC_ISW_PAY_ITEM_ID,
+      txn_ref: txnRef,
+      amount: amountInKobo,
+      currency: 566,
+      site_redirect_url: redirectUrl,
+      cust_email: "client@craftid.ng",
+      cust_name: name || "Client",
+      pay_item_name: purpose || `Payment to ${artisanName}`,
+      mode: checkoutMode,
+      onClose: () => {
+        if (checkoutWatchdogRef.current) {
+          window.clearTimeout(checkoutWatchdogRef.current);
+          checkoutWatchdogRef.current = null;
+        }
+        setLoading(false);
+        setPaymentDebug((prev) => [...prev, "Checkout closed by user."]);
+      },
+      onComplete: async (response: any) => {
+        if (checkoutWatchdogRef.current) {
+          window.clearTimeout(checkoutWatchdogRef.current);
+          checkoutWatchdogRef.current = null;
+        }
+        setLoading(false);
+        setPaymentDebug((prev) => [
+          ...prev,
+          `onComplete: code=${response?.resp || response?.ResponseCode || "UNKNOWN"}`,
+          `onComplete: ref=${response?.txnref || response?.txn_ref || txnRef}`,
+        ]);
+        try {
+          if (response?.resp === "00" || response?.ResponseCode === "00") {
+            const verify = await fetch("/api/verify-payment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                txnRef,
+                amount: amountInKobo,
+                clientName: name || "Client",
+                artisanName,
+              }),
+            });
+
+            const result = await verify.json();
+            setPaymentDebug((prev) => [
+              ...prev,
+              `verify-payment: status=${verify.status}`,
+              `verify-payment: success=${Boolean(result?.success)}`,
+              `verify-payment: responseCode=${result?.responseCode || "N/A"}`,
+            ]);
+
+            if (result.success && result.transaction) {
+              const existingTransactions = parseJsonSafe<StoredTransaction[]>(localStorage.getItem("craftid_transactions")) || [];
+              existingTransactions.push(result.transaction);
+              localStorage.setItem("craftid_transactions", JSON.stringify(existingTransactions));
+
+              const stats = parseJsonSafe<{ count: number; volume: number }>(localStorage.getItem("craftid_stats")) || {
+                count: 0,
+                volume: 0,
+              };
+              stats.count += 1;
+              stats.volume += result.transaction.amount;
+              localStorage.setItem("craftid_stats", JSON.stringify(stats));
+
+              setPaidAmount(parsedAmount);
+              setSuccess(true);
+            } else {
+              setPaymentError("Payment could not be verified. Please contact support.");
+            }
+          } else {
+            const responseCode = response?.resp || response?.ResponseCode || "UNKNOWN";
+            const responseText = response?.desc || response?.ResponseDescription || "Payment was not completed.";
+            setPaymentError(`${responseText} (Code: ${responseCode})`);
+          }
+        } catch (error) {
+          console.error("Payment verification failed:", error);
+          setPaymentError("Payment verification failed. Please try again.");
+        }
+      },
+    };
+
+    setPaymentDebug([
+      `mode=${checkoutMode}`,
+      `merchant=${process.env.NEXT_PUBLIC_ISW_MERCHANT_CODE || "missing"}`,
+      `payItem=${process.env.NEXT_PUBLIC_ISW_PAY_ITEM_ID || "missing"}`,
+      `amountKobo=${amountInKobo}`,
+      `redirect=${redirectUrl}`,
+      `txnRef=${txnRef}`,
+    ]);
 
     try {
-      window.webpayCheckout({
-        merchant_code: process.env.NEXT_PUBLIC_ISW_MERCHANT_CODE,
-        pay_item_id: process.env.NEXT_PUBLIC_ISW_PAY_ITEM_ID,
-        txn_ref: txnRef,
-        amount: amountInKobo,
-        currency: 566,
-        site_redirect_url: window.location.href,
-        cust_email: "client@craftid.ng",
-        cust_name: name || "Client",
-        pay_item_name: purpose || `Payment to ${artisanName}`,
-        mode: process.env.NEXT_PUBLIC_ISW_MODE,
-        onComplete: async (response: any) => {
-          setLoading(false);
-          try {
-            if (response?.resp === "00" || response?.ResponseCode === "00") {
-              const verify = await fetch("/api/verify-payment", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  txnRef,
-                  amount: amountInKobo,
-                  clientName: name || "Client",
-                  artisanName,
-                }),
-              });
-
-              const result = await verify.json();
-              if (result.success && result.transaction) {
-                const existingTransactions = parseJsonSafe<StoredTransaction[]>(localStorage.getItem("craftid_transactions")) || [];
-                existingTransactions.push(result.transaction);
-                localStorage.setItem("craftid_transactions", JSON.stringify(existingTransactions));
-
-                const stats = parseJsonSafe<{ count: number; volume: number }>(localStorage.getItem("craftid_stats")) || {
-                  count: 0,
-                  volume: 0,
-                };
-                stats.count += 1;
-                stats.volume += result.transaction.amount;
-                localStorage.setItem("craftid_stats", JSON.stringify(stats));
-
-                setPaidAmount(parsedAmount);
-                setSuccess(true);
-              } else {
-                setPaymentError("Payment could not be verified. Please contact support.");
-              }
-            } else {
-              setPaymentError("Payment was not completed. Please try again.");
-            }
-          } catch (error) {
-            console.error("Payment verification failed:", error);
-            setPaymentError("Payment verification failed. Please try again.");
-          }
-        },
-      });
+      setPaymentDebug((prev) => [...prev, "checkout=invoked"]);
+      window.webpayCheckout(checkoutConfig);
+      checkoutWatchdogRef.current = window.setTimeout(() => {
+        setLoading(false);
+        setPaymentError("Checkout did not respond. Please disable popup/ad blocker and try again.");
+        setPaymentDebug((prev) => [...prev, "checkout=timeout-no-callback"]);
+      }, 20000);
     } catch (error) {
       console.error("Checkout launch failed:", error);
+      if (checkoutWatchdogRef.current) {
+        window.clearTimeout(checkoutWatchdogRef.current);
+        checkoutWatchdogRef.current = null;
+      }
       setLoading(false);
       setPaymentError("Unable to start checkout. Please refresh and try again.");
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (checkoutWatchdogRef.current) {
+        window.clearTimeout(checkoutWatchdogRef.current);
+        checkoutWatchdogRef.current = null;
+      }
+    };
+  }, []);
 
   if (profileLoading) {
     return (
@@ -365,6 +444,14 @@ export default function PublicPayPage() {
                 {loading ? "Processing..." : `Pay ${formatNaira(parsedAmount || 0)} →`}
               </button>
               {paymentError ? <p className="mt-3 text-sm" style={{ color: "#DC2626" }}>{paymentError}</p> : null}
+              {paymentDebug.length > 0 ? (
+                <div className="mt-3 rounded-xl border p-3" style={{ borderColor: "#E2E8F0", background: "#F8FAFC" }}>
+                  <p className="mb-1 text-xs font-semibold" style={{ color: "#334155" }}>Payment debug</p>
+                  <p className="text-xs whitespace-pre-line" style={{ color: "#64748B" }}>
+                    {paymentDebug.join("\n")}
+                  </p>
+                </div>
+              ) : null}
               <div className="mt-4 flex items-center justify-center gap-2 text-xs" style={{ color: "#64748B" }}>
                 <Shield size={12} />Secured by Interswitch · VERVE VISA
               </div>

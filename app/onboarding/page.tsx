@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronLeft, Shield, UserCircle2 } from "lucide-react";
+import { Check, ChevronLeft, Loader2, Shield, UserCircle2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useMemo, useState } from "react";
 
@@ -37,6 +37,30 @@ export default function OnboardingPage() {
       : `https://craftid.ng/pay/${slug}`);
 
   const formatMoney = (v: string) => v.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  type RateKey = "minJob" | "avgJob" | "premiumJob";
+  const RATE_MIN = 5000;
+  const RATE_MAX = 500000;
+  const RATE_STEP = 1000;
+
+  const parseRate = (value: string) => {
+    const parsed = Number(value.replace(/,/g, ""));
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const getDefaultRate = (key: RateKey) => {
+    if (key === "minJob") return 15000;
+    if (key === "avgJob") return 50000;
+    return 120000;
+  };
+
+  const getRateValue = (key: RateKey) => {
+    const parsed = parseRate(form[key]);
+    return parsed >= RATE_MIN ? parsed : getDefaultRate(key);
+  };
+
+  const setRateValue = (key: RateKey, value: number) => {
+    setForm((f) => ({ ...f, [key]: formatMoney(String(value)) }));
+  };
 
   const handleCopyPaymentUrl = async () => {
     try {
@@ -156,9 +180,9 @@ export default function OnboardingPage() {
 
                 {step === 2 && <div><h1 style={{ fontFamily: "var(--font-syne)", fontSize: 32, fontWeight: 700 }}>What&apos;s your craft?</h1><p style={{ color: "var(--text-2)", marginTop: 6 }}>Choose your primary skill</p><div className="mt-7 grid grid-cols-3 gap-3">{skills.map((skill) => {const active = form.skill === skill; const [emoji, ...rest] = skill.split(" "); return <button key={skill} onClick={() => setForm((f) => ({ ...f, skill }))} className="flex flex-col items-center gap-2 rounded-2xl px-2 py-4" style={{ background: active ? "var(--orange-dim)" : "var(--surface)", border: `1px solid ${active ? "var(--orange)" : "var(--border)"}`, boxShadow: active ? "0 0 0 3px var(--orange-dim)" : "none" }}><span style={{ fontSize: 28 }}>{emoji}</span><span style={{ color: active ? "var(--orange)" : "var(--text-2)", fontSize: 12 }}>{rest.join(" ")}</span>{active ? <span className="h-2 w-2 rounded-full" style={{ background: "var(--orange)" }} /> : null}</button>;})}</div><div className="mt-6"><label style={{ color: "var(--text-2)", fontSize: 14 }}>Years of experience: <span style={{ color: "var(--orange)", fontWeight: 600 }}>{form.experience} years</span></label><input type="range" min={1} max={25} className="mt-3 w-full" style={{ accentColor: "var(--orange)" }} value={form.experience} onChange={(e) => setForm((f) => ({ ...f, experience: Number(e.target.value) }))} /></div></div>}
 
-                {step === 3 && <div><h1 style={{ fontFamily: "var(--font-syne)", fontSize: 32, fontWeight: 700 }}>Set your rates</h1><p style={{ color: "var(--text-2)", marginTop: 6 }}>Help clients understand your pricing</p><div className="mt-7 space-y-4">{[["Minimum job (small repair or alteration)", "minJob"], ["Average job", "avgJob"], ["Premium job (optional)", "premiumJob"]].map(([label, key]) => <div key={key}><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>{label}</label><div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: "var(--orange)" }}>₦</span><input className="w-full rounded-xl py-3.5 pl-9 pr-4" value={form[key as keyof typeof form] as string} onChange={(e) => setForm((f) => ({ ...f, [key]: formatMoney(e.target.value) }))} /></div></div>)}<div><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>Bio</label><textarea rows={3} className="w-full resize-none rounded-xl px-4 py-3.5" placeholder="Master tailor with 12 years experience..." value={form.bio} onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))} /></div></div></div>}
+                {step === 3 && <div><h1 style={{ fontFamily: "var(--font-syne)", fontSize: 32, fontWeight: 700 }}>Set your rates</h1><p style={{ color: "var(--text-2)", marginTop: 6 }}>Help clients understand your pricing</p><div className="mt-7 space-y-5">{[["Minimum job (small repair or alteration)", "minJob"], ["Average job", "avgJob"], ["Premium job (optional)", "premiumJob"]].map(([label, key]) => { const rateKey = key as RateKey; const currentValue = getRateValue(rateKey); return <div key={key}><div className="mb-2 flex items-center justify-between"><label className="block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>{label}</label><span style={{ color: "var(--orange)", fontFamily: "var(--font-dm-mono)", fontSize: 13, fontWeight: 700 }}>₦{formatMoney(String(currentValue))}</span></div><input type="range" min={RATE_MIN} max={RATE_MAX} step={RATE_STEP} className="w-full" style={{ accentColor: "var(--orange)" }} value={currentValue} onChange={(e) => setRateValue(rateKey, Number(e.target.value))} /></div>;})}<div><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>Bio</label><textarea rows={3} className="w-full resize-none rounded-xl px-4 py-3.5" placeholder="Master tailor with 12 years experience..." value={form.bio} onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))} /></div></div></div>}
 
-                {step === 4 && <div><h1 style={{ fontFamily: "var(--font-syne)", fontSize: 32, fontWeight: 700 }}>Verify your identity</h1><div className="mt-5 flex items-center gap-2 rounded-xl border px-4 py-3" style={{ background: "var(--orange-dim)", borderColor: "rgba(249,115,22,0.2)" }}><Shield size={16} style={{ color: "var(--orange)" }} /><p style={{ fontSize: 13 }}>Your data is encrypted and secured by Interswitch</p></div><div className="mt-5 space-y-4"><div><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>BVN</label><div className="flex gap-2"><input className="flex-1 rounded-xl px-4 py-3.5" maxLength={11} value={form.bvn} placeholder="Enter 11-digit BVN" onChange={(e) => { setForm((f) => ({ ...f, bvn: e.target.value.replace(/\D/g, "") })); setBvnVerified(false); setBvnError(null); }} /><button onClick={handleVerifyBVN} disabled={bvnVerifying || form.bvn.length !== 11} className="rounded-xl px-4 py-2" style={{ background: form.bvn.length === 11 && !bvnVerifying ? "var(--orange)" : "var(--surface)", color: form.bvn.length === 11 && !bvnVerifying ? "white" : "var(--text-3)" }}>{bvnVerifying ? "..." : "Verify"}</button></div>{bvnVerified && <p className="text-sm" style={{ color: "var(--green)" }}>✓ Verified: {verifiedName}</p>}{bvnError && <p className="text-sm" style={{ color: "var(--red)" }}>{bvnError}</p>}</div><div><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>NIN (optional)</label><input className="w-full rounded-xl px-4 py-3.5" value={form.nin} onChange={(e) => setForm((f) => ({ ...f, nin: e.target.value.replace(/\D/g, "") }))} /></div><button onClick={() => setForm((f) => ({ ...f, agree: !f.agree }))} className="flex items-center gap-3"><span className="grid h-5 w-5 place-items-center rounded border" style={{ borderColor: form.agree ? "var(--orange)" : "var(--border)", background: form.agree ? "var(--orange)" : "transparent" }}>{form.agree ? <Check size={13} style={{ color: "white" }} /> : null}</span><span style={{ color: "var(--text-2)", fontSize: 13 }}>I agree to the <a href="#" style={{ color: "var(--orange)", textDecoration: "underline" }}>Terms</a> and <a href="#" style={{ color: "var(--orange)", textDecoration: "underline" }}>Privacy</a>.</span></button></div></div>}
+                {step === 4 && <div><h1 style={{ fontFamily: "var(--font-syne)", fontSize: 32, fontWeight: 700 }}>Verify your identity</h1><div className="mt-5 flex items-center gap-2 rounded-xl border px-4 py-3" style={{ background: "var(--orange-dim)", borderColor: "rgba(249,115,22,0.2)" }}><Shield size={16} style={{ color: "var(--orange)" }} /><p style={{ fontSize: 13 }}>Your data is encrypted and secured by Interswitch</p></div><div className="mt-5 space-y-4"><div><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>BVN</label><div className="flex gap-2"><input className="flex-1 rounded-xl px-4 py-3.5" maxLength={11} value={form.bvn} placeholder="Enter 11-digit BVN" onChange={(e) => { setForm((f) => ({ ...f, bvn: e.target.value.replace(/\D/g, "") })); setBvnVerified(false); setBvnError(null); }} /><button onClick={handleVerifyBVN} disabled={bvnVerifying || form.bvn.length !== 11} className="inline-flex items-center gap-2 rounded-xl px-4 py-2" style={{ background: form.bvn.length === 11 && !bvnVerifying ? "var(--orange)" : "var(--surface)", color: form.bvn.length === 11 && !bvnVerifying ? "white" : "var(--text-3)" }}>{bvnVerifying ? <><Loader2 size={14} className="animate-spin" /><span>Verifying...</span></> : "Verify"}</button></div>{bvnVerified && <p className="text-sm" style={{ color: "var(--green)" }}>✓ Verified: {verifiedName}</p>}{bvnError && <p className="text-sm" style={{ color: "var(--red)" }}>{bvnError}</p>}</div><div><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>NIN (optional)</label><input className="w-full rounded-xl px-4 py-3.5" value={form.nin} onChange={(e) => setForm((f) => ({ ...f, nin: e.target.value.replace(/\D/g, "") }))} /></div><button onClick={() => setForm((f) => ({ ...f, agree: !f.agree }))} className="flex items-center gap-3"><span className="grid h-5 w-5 place-items-center rounded border" style={{ borderColor: form.agree ? "var(--orange)" : "var(--border)", background: form.agree ? "var(--orange)" : "transparent" }}>{form.agree ? <Check size={13} style={{ color: "white" }} /> : null}</span><span style={{ color: "var(--text-2)", fontSize: 13 }}>I agree to the <a href="#" style={{ color: "var(--orange)", textDecoration: "underline" }}>Terms</a> and <a href="#" style={{ color: "var(--orange)", textDecoration: "underline" }}>Privacy</a>.</span></button></div></div>}
               </motion.div>
             </AnimatePresence>
 
