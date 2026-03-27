@@ -19,6 +19,8 @@ type StoredTransaction = {
   clientName: string;
   artisanName: string;
   timestamp: string;
+  status?: string;
+  purpose?: string | null;
 };
 
 const parseJsonSafe = <T,>(value: string | null): T | null => {
@@ -34,6 +36,12 @@ export default function PublicPayPage() {
   const params = useParams();
   const username = params?.username as string;
   const { user } = useUser();
+
+  const fallbackName = (username || "artisan")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 
   const [expanded, setExpanded] = useState(false);
   const [amount, setAmount] = useState("");
@@ -51,6 +59,55 @@ export default function PublicPayPage() {
   const parsedAmount = useMemo(() => Number(amount.replace(/,/g, "") || 0), [amount]);
 
   useEffect(() => {
+    let matchedLocalProfile: UserProfile | null = null;
+
+    type PaymentRow = {
+      id?: string;
+      txn_ref?: string;
+      amount_kobo?: number;
+      client_name?: string;
+      artisan_slug?: string;
+      paid_at?: string;
+      status?: string;
+      purpose?: string | null;
+    };
+
+    const fetchFromDb = async () => {
+      try {
+        const [profileRes, paymentsRes] = await Promise.all([
+          fetch(`/api/users/${encodeURIComponent(username)}`),
+          fetch(`/api/payments?slug=${encodeURIComponent(username)}&limit=3`),
+        ]);
+
+        if (profileRes.ok) {
+          const profileJson = await profileRes.json();
+          const profile = profileJson?.artisan?.profile;
+          if (profile && typeof profile === "object") {
+            setArtisanProfile(profile as UserProfile);
+          }
+        }
+
+        if (paymentsRes.ok) {
+          const paymentsJson = await paymentsRes.json();
+          const txs = Array.isArray(paymentsJson?.payments) ? paymentsJson.payments : [];
+          const mapped = (txs as PaymentRow[])
+            .slice(0, 3)
+            .map((tx, index) => ({
+              id: tx.txn_ref || tx.id || `tx-${index}`,
+              clientName: tx.client_name || "Client",
+              amount: Number(tx.amount_kobo || 0) / 100,
+              artisanName: matchedLocalProfile?.fullName || fallbackName || "Artisan",
+              timestamp: tx.paid_at || new Date().toISOString(),
+              status: tx.status || "completed",
+              purpose: tx.purpose || null,
+            }));
+          setRecentTransactions(mapped);
+        }
+      } catch (err) {
+        console.error("[CraftID] Failed to fetch public profile/payments:", err);
+      }
+    };
+
     try {
       const profileCandidates: UserProfile[] = [];
       const parsedUser = parseJsonSafe<UserProfile>(localStorage.getItem("craftid_user"));
@@ -64,8 +121,8 @@ export default function PublicPayPage() {
       }
 
       const slugToFind = (username || "").toLowerCase();
-      const matched = profileCandidates.find((candidate) => candidate.slug === slugToFind) || null;
-      setArtisanProfile(matched);
+      matchedLocalProfile = profileCandidates.find((candidate) => candidate.slug === slugToFind) || null;
+      setArtisanProfile(matchedLocalProfile);
 
       const parsedTransactions = parseJsonSafe<StoredTransaction[]>(localStorage.getItem("craftid_transactions"));
       if (Array.isArray(parsedTransactions)) {
@@ -98,9 +155,13 @@ export default function PublicPayPage() {
     } catch (error) {
       console.error("Failed to load artisan profile:", error);
     } finally {
-      setProfileLoading(false);
+      if (!matchedLocalProfile && username) {
+        void fetchFromDb().finally(() => setProfileLoading(false));
+      } else {
+        setProfileLoading(false);
+      }
     }
-  }, [username, user]);
+  }, [username, user, fallbackName]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -143,12 +204,6 @@ export default function PublicPayPage() {
 
     return () => window.clearInterval(timer);
   }, []);
-
-  const fallbackName = (username || "artisan")
-    .split("-")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 
   const resolvedUser = artisanProfile || user;
   const artisanName = resolvedUser?.fullName || fallbackName || "Artisan";
@@ -204,18 +259,21 @@ export default function PublicPayPage() {
         cust_name: name || "Client",
         pay_item_name: purpose || `Payment to ${artisanName}`,
         mode: process.env.NEXT_PUBLIC_ISW_MODE,
-        onComplete: async (response: any) => {
+        onComplete: async (response: unknown) => {
           setLoading(false);
           try {
-            if (response?.resp === "00" || response?.ResponseCode === "00") {
+            const r = response as { resp?: unknown; ResponseCode?: unknown } | null;
+            if (r?.resp === "00" || r?.ResponseCode === "00") {
               const verify = await fetch("/api/verify-payment", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   txnRef,
                   amount: amountInKobo,
+                  username,
                   clientName: name || "Client",
                   artisanName,
+                  purpose: purpose || null,
                 }),
               });
 

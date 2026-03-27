@@ -1,16 +1,26 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { mockTransactions } from "@/lib/mock-data";
 import { formatNaira } from "@/lib/utils";
 
+type TransactionRow = {
+  id: string;
+  clientName: string;
+  description?: string;
+  amount: number;
+  timestamp: string;
+  initials?: string;
+  color?: string;
+};
+
 type TransactionFeedProps = {
+  transactions?: TransactionRow[];
   limit?: number;
   showHeader?: boolean;
 };
 
-export function TransactionFeed({ limit = 8, showHeader = false }: TransactionFeedProps) {
-  const data = mockTransactions.slice(0, limit);
+export function TransactionFeed({ transactions = [], limit = 8, showHeader = false }: TransactionFeedProps) {
+  const data = transactions.slice(0, limit);
 
   return (
     <div className="w-full">
@@ -24,6 +34,12 @@ export function TransactionFeed({ limit = 8, showHeader = false }: TransactionFe
       ) : null}
 
       <div className="flex flex-col gap-2">
+        {data.length === 0 ? (
+          <p className="text-sm" style={{ color: "var(--text-2)" }}>
+            No payments yet.
+          </p>
+        ) : null}
+
         {data.map((tx, i) => (
           <motion.div
             key={tx.id}
@@ -43,20 +59,25 @@ export function TransactionFeed({ limit = 8, showHeader = false }: TransactionFe
               <div
                 className="grid h-10 w-10 place-items-center rounded-full border text-sm font-semibold"
                 style={{
-                  background: `${tx.color}33`,
-                  borderColor: `${tx.color}66`,
-                  color: tx.color,
+                  background: `${(tx.color ?? "#F97316")}33`,
+                  borderColor: `${(tx.color ?? "#F97316")}66`,
+                  color: tx.color ?? "#F97316",
                   fontFamily: "var(--font-dm-sans)",
                 }}
               >
-                {tx.initials}
+                {tx.initials ?? tx.clientName
+                  .split(" ")
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((part) => part[0]?.toUpperCase())
+                  .join("")}
               </div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium" style={{ color: "var(--text-1)" }}>
                   {tx.clientName}
                 </p>
                 <p className="truncate text-xs" style={{ color: "var(--text-2)" }}>
-                  {tx.description}
+                  {tx.description ?? "Payment received"}
                 </p>
               </div>
             </div>

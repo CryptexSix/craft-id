@@ -19,11 +19,11 @@ interface Transaction {
 export default function CardPage() {
   const { user, loading: userLoading } = useUser();
   const [frozen, setFrozen] = useState(false);
-  const [craftScore, setCraftScore] = useState(300);
+  const [craftScore, setCraftScore] = useState(0);
   const [bvnVerified, setBvnVerified] = useState(false);
   const [stats, setStats] = useState({ count: 0, volume: 0 });
   const [loading, setLoading] = useState(true);
-  const [cardTransactions, setCardTransactions] = useState<any[]>([]);
+  const [cardTransactions, setCardTransactions] = useState<Transaction[]>([]);
 
   // Load data from localStorage
   useEffect(() => {
@@ -41,7 +41,7 @@ export default function CardPage() {
           // Card transactions would come from card usage, but for demo we'll show recent payments
           setCardTransactions(txns.slice(0, 5));
         }
-        
+
         // Load BVN verification status
         const bvnStatus = localStorage.getItem("craftid_bvn_verified");
         setBvnVerified(bvnStatus === "true");
@@ -49,7 +49,7 @@ export default function CardPage() {
         console.error("Error loading card data:", err);
       }
     };
-    
+
     loadData();
   }, []);
 
@@ -57,7 +57,13 @@ export default function CardPage() {
   useEffect(() => {
     const calculateScore = async () => {
       try {
-        const accountAgeDays = 34;
+        const accountAgeDays = (() => {
+          if (!user?.createdAt) return 0;
+          const created = new Date(user.createdAt);
+          if (Number.isNaN(created.getTime())) return 0;
+          const diffMs = new Date().getTime() - created.getTime();
+          return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+        })();
         const scoreRes = await fetch("/api/craft-score", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -68,7 +74,7 @@ export default function CardPage() {
             accountAgeDays: accountAgeDays,
           }),
         });
-        
+
         const scoreData = await scoreRes.json();
         setCraftScore(scoreData.score);
       } catch (err) {
@@ -77,14 +83,14 @@ export default function CardPage() {
         setLoading(false);
       }
     };
-    
+
     calculateScore();
-  }, [bvnVerified, stats.count, stats.volume]);
+  }, [bvnVerified, stats.count, stats.volume, user?.createdAt]);
 
   // Calculate card limits based on score
-  const cardLimit = craftScore >= 800 ? 500000 : craftScore >= 650 ? 200000 : craftScore >= 500 ? 50000 : 0;
+  const cardLimit = craftScore >= 500 ? 500000 : craftScore >= 350 ? 200000 : craftScore >= 200 ? 50000 : 0;
   const cardAvailable = cardLimit > 0 ? Math.min(cardLimit, stats.volume * 2) : 0;
-  const isEligible = craftScore >= 500;
+  const isEligible = craftScore >= 200;
 
   // Card expiry (3 years from now)
   const expiry = new Date();
@@ -107,7 +113,7 @@ export default function CardPage() {
   }
 
   if (!isEligible) {
-    const pointsNeeded = 500 - craftScore;
+    const pointsNeeded = 200 - craftScore;
     return (
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }} className="space-y-4">
         <header>
@@ -125,7 +131,7 @@ export default function CardPage() {
             <p className="text-sm" style={{ color: "var(--text-2)" }}>Ways to increase your score:</p>
             <ul className="mt-2 text-left text-sm space-y-1" style={{ color: "var(--text-2)" }}>
               <li>✓ Make {Math.ceil(pointsNeeded / 5)} more transactions</li>
-              <li>✓ Process at least ₦{Math.ceil((500 - craftScore) * 1000)} in payments</li>
+              <li>✓ Process at least ₦{Math.ceil((200 - craftScore) * 1000)} in payments</li>
               <li>✓ Verify your identity with BVN</li>
             </ul>
           </div>
@@ -149,7 +155,7 @@ export default function CardPage() {
       </header>
 
       <section className="mx-auto max-w-115" style={frozen ? { filter: "grayscale(100%)", opacity: 0.5 } : {}}>
-        <VirtualCard 
+        <VirtualCard
           last4={stats.count > 0 ? String(stats.count).slice(-4).padStart(4, '0') : "0000"}
           expiry={expiryFormatted}
           name="CraftID Business"
@@ -170,7 +176,7 @@ export default function CardPage() {
 
       {frozen ? (
         <div className="rounded-xl border p-3" style={{ background: "rgba(234,179,8,0.1)", borderColor: "var(--yellow)", color: "var(--yellow)" }}>
-          Card is frozen. Tap "Unfreeze Card" to reactivate.
+          Card is frozen. Tap &quot;Unfreeze Card&quot; to reactivate.
         </div>
       ) : null}
 
@@ -222,16 +228,16 @@ export default function CardPage() {
       <section className="flex flex-col items-start justify-between gap-3 rounded-xl border p-5 md:flex-row md:items-center" style={{ background: "linear-gradient(135deg, var(--purple-dim), var(--surface))", borderColor: "rgba(124,58,237,0.2)" }}>
         <div>
           <p style={{ fontWeight: 600 }}>
-            {craftScore >= 800 ? (
+            {craftScore >= 500 ? (
               <span className="inline-flex items-center gap-1"><CheckCircle2 size={16} style={{ color: "var(--green)" }} /> Maximum Limit Reached!</span>
             ) : (
-              `Increase your limit to ${formatNaira(craftScore >= 650 ? 500000 : 200000)}`
+              `Increase your limit to ${formatNaira(craftScore >= 350 ? 500000 : 200000)}`
             )}
           </p>
           <p style={{ color: "var(--text-2)", fontSize: 13 }}>
-            {craftScore >= 800 
+            {craftScore >= 500
               ? "You've unlocked the maximum card limit"
-              : `${craftScore >= 650 ? "Reach CraftScore 800" : "Reach CraftScore 650 for ₦200,000, then 800 for ₦500,000"}`
+              : `${craftScore >= 350 ? "Reach CraftScore 500" : "Reach CraftScore 350 for ₦200,000, then 500 for ₦500,000"}`
             }
           </p>
         </div>

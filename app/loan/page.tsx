@@ -19,7 +19,7 @@ export default function LoanPage() {
   const { user, loading: userLoading } = useUser();
   const [amount, setAmount] = useState(50000);
   const [accepted, setAccepted] = useState(false);
-  const [craftScore, setCraftScore] = useState(300);
+  const [craftScore, setCraftScore] = useState(0);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ count: 0, volume: 0 });
   const [bvnVerified, setBvnVerified] = useState(false);
@@ -38,7 +38,7 @@ export default function LoanPage() {
             volume: totalVolume,
           });
         }
-        
+
         // Load BVN verification status
         const bvnStatus = localStorage.getItem("craftid_bvn_verified");
         setBvnVerified(bvnStatus === "true");
@@ -46,7 +46,7 @@ export default function LoanPage() {
         console.error("Error loading loan data:", err);
       }
     };
-    
+
     loadData();
   }, []);
 
@@ -54,7 +54,13 @@ export default function LoanPage() {
   useEffect(() => {
     const calculateScore = async () => {
       try {
-        const accountAgeDays = 34;
+        const accountAgeDays = (() => {
+          if (!user?.createdAt) return 0;
+          const created = new Date(user.createdAt);
+          if (Number.isNaN(created.getTime())) return 0;
+          const diffMs = new Date().getTime() - created.getTime();
+          return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+        })();
         const scoreRes = await fetch("/api/craft-score", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -65,7 +71,7 @@ export default function LoanPage() {
             accountAgeDays: accountAgeDays,
           }),
         });
-        
+
         const scoreData = await scoreRes.json();
         setCraftScore(scoreData.score);
       } catch (err) {
@@ -74,22 +80,22 @@ export default function LoanPage() {
         setLoading(false);
       }
     };
-    
+
     calculateScore();
-  }, [bvnVerified, stats.count, stats.volume]);
+  }, [bvnVerified, stats.count, stats.volume, user?.createdAt]);
 
   // Calculate loan eligibility based on score
   const loanEligibility = useMemo(() => {
-    if (craftScore >= 900) return { maxAmount: 1000000, rate: 2.5, term: 12, purpose: "Premium Growth" };
-    if (craftScore >= 800) return { maxAmount: 500000, rate: 3.0, term: 9, purpose: "Business Expansion" };
-    if (craftScore >= 650) return { maxAmount: 150000, rate: 3.5, term: 6, purpose: "Equipment" };
-    if (craftScore >= 500) return { maxAmount: 50000, rate: 4.0, term: 3, purpose: "Starter" };
+    if (craftScore >= 650) return { maxAmount: 1000000, rate: 2.5, term: 12, purpose: "Premium Growth" };
+    if (craftScore >= 500) return { maxAmount: 500000, rate: 3.0, term: 9, purpose: "Business Expansion" };
+    if (craftScore >= 350) return { maxAmount: 150000, rate: 3.5, term: 6, purpose: "Equipment" };
     return { maxAmount: 0, rate: 0, term: 0, purpose: "Locked" };
   }, [craftScore]);
 
   const minAmount = loanEligibility.maxAmount > 0 ? 50000 : 0;
   const maxAmount = loanEligibility.maxAmount;
-  const isEligible = craftScore >= 650;
+  const isEligible = craftScore >= 350;
+  const needsBVN = !bvnVerified;
 
   // Set initial amount when eligibility loads
   useEffect(() => {
@@ -119,7 +125,7 @@ export default function LoanPage() {
   }
 
   if (!isEligible) {
-    const pointsNeeded = 650 - craftScore;
+    const pointsNeeded = 350 - craftScore;
     return (
       <motion.main
         initial={{ opacity: 0, y: 16 }}
@@ -146,6 +152,38 @@ export default function LoanPage() {
             style={{ background: "var(--orange)", color: "white" }}
           >
             View Score Details →
+          </a>
+        </div>
+      </motion.main>
+    );
+  }
+
+  if (needsBVN) {
+    return (
+      <motion.main
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex min-h-[70vh] flex-col items-center justify-center px-4 text-center"
+      >
+        <div className="mx-auto flex w-full max-w-105 flex-col gap-5">
+          <Shield size={48} style={{ color: "var(--orange)", margin: "0 auto" }} />
+          <h1 style={{ fontFamily: "var(--font-syne)", fontSize: 28, fontWeight: 800 }}>BVN Required</h1>
+          <p style={{ color: "var(--text-2)" }}>
+            You’re eligible based on your CraftScore (<strong>{craftScore}</strong>), but you must verify your BVN before taking a loan.
+          </p>
+          <div className="rounded-xl border p-5" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+            <p className="text-sm" style={{ color: "var(--text-2)" }}>Verify BVN to unlock loans:</p>
+            <ul className="mt-2 text-left text-sm space-y-1" style={{ color: "var(--text-2)" }}>
+              <li>✓ Adds identity points to your CraftScore</li>
+              <li>✓ Required for compliance and disbursement</li>
+            </ul>
+          </div>
+          <a
+            href="/score"
+            className="rounded-xl px-6 py-3"
+            style={{ background: "var(--orange)", color: "white" }}
+          >
+            Verify BVN on Score Page →
           </a>
         </div>
       </motion.main>
