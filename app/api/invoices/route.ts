@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { createInvoice } from "@/lib/interswitch";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 function jsonError(message: string, status = 400) {
@@ -53,55 +52,78 @@ export async function POST(req: NextRequest) {
     .upsert({ slug: artisanSlug }, { onConflict: "slug" });
   if (artisanErr) return jsonError(artisanErr.message, 500);
 
-  let providerResponse: any;
-  try {
-    providerResponse = await createInvoice({
-      amountKobo: Math.trunc(amountKobo),
-      customerName,
-      customerEmail,
-      description,
-    });
-  } catch (e: any) {
-    return jsonError(e?.message ?? "Invoice provider error", 502);
+  function formatInvoiceRef(n: number) {
+    return `INV-${String(n).padStart(8, "0")}`;
   }
 
-  const reference = (
-    providerResponse?.reference ??
-    providerResponse?.data?.reference ??
-    providerResponse?.invoiceReference ??
-    ""
-  ).toString();
+  async function getNextInvoiceNumber() {
+    // MVP approach: scan recent internal invoices and pick the next number.
+    // This keeps the format INV-00000001 and is safe enough for low-volume usage.
+    const { data, error } = await supabase
+      .from("invoices")
+      .select("reference, created_at")
+      .like("reference", "INV-%")
+      .order("created_at", { ascending: false })
+      .limit(200);
 
-  if (!reference) {
-    return jsonError("Provider response missing invoice reference", 502);
+    if (error) throw new Error(error.message);
+
+    let max = 0;
+    for (const row of data ?? []) {
+      const ref = String((row as any)?.reference ?? "").trim();
+      const m = /^INV-(\d+)$/.exec(ref);
+      if (!m) continue;
+      const num = Number(m[1]);
+      if (Number.isFinite(num) && num > max) max = num;
+    }
+    return max + 1;
   }
 
   const dueAt = body?.dueAt ? new Date(body.dueAt).toISOString() : null;
 
-  const { data, error } = await supabase
-    .from("invoices")
-    .upsert(
-      {
-        artisan_slug: artisanSlug,
-        reference,
-        amount_kobo: Math.trunc(amountKobo),
-        customer_name: customerName,
-        customer_email: customerEmail,
-        description: description || null,
-        address: body?.address ? String(body.address) : null,
-        due_at: dueAt,
-        status: "created",
-        provider: "interswitch",
-        provider_payload: providerResponse,
-      },
-      { onConflict: "reference" },
-    )
-    .select(
-      "id, reference, amount_kobo, customer_name, customer_email, description, address, due_at, status, provider, created_at",
-    )
-    .single();
+  let lastErr: any;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const nextNum = (await getNextInvoiceNumber()) + attempt;
+      const reference = formatInvoiceRef(nextNum);
 
-  if (error) return jsonError(error.message, 500);
+      const { data, error } = await supabase
+        .from("invoices")
+        .insert({
+          artisan_slug: artisanSlug,
+          reference,
+          amount_kobo: Math.trunc(amountKobo),
+          customer_name: customerName,
+          customer_email: customerEmail,
+          description: description || null,
+          address: body?.address ? String(body.address) : null,
+          due_at: dueAt,
+          status: "created",
+          provider: "internal",
+          provider_payload: {
+            source: "craftid",
+            createdVia: "api",
+          },
+        })
+        .select(
+          "id, reference, amount_kobo, customer_name, customer_email, description, address, due_at, status, provider, created_at",
+        )
+        .single();
 
-  return NextResponse.json({ invoice: data, provider: providerResponse });
+      if (error) {
+        // Retry on unique ref collisions
+        if (/duplicate key|unique/i.test(error.message)) {
+          lastErr = error;
+          continue;
+        }
+        return jsonError(error.message, 500);
+      }
+
+      return NextResponse.json({ invoice: data });
+    } catch (e: any) {
+      lastErr = e;
+    }
+  }
+
+  return jsonError(lastErr?.message ?? "Failed to create invoice", 500);
 }

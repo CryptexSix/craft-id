@@ -245,6 +245,14 @@ export default function LoanPage() {
           <p style={{ color: "var(--text-2)" }}>Pre-approved for {user?.firstName || "you"} based on your CraftScore of {craftScore}</p>
         </header>
 
+        <a
+          href="/loan/report"
+          className="rounded-xl border px-4 py-3 text-sm"
+          style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text-1)" }}
+        >
+          Generate income verification PDF →
+        </a>
+
         <section
           className="relative overflow-hidden rounded-2xl border p-6"
           style={{

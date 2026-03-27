@@ -428,7 +428,7 @@ export default function DashboardPage() {
         </div>
         <div className="space-y-4 lg:col-span-2">
           <PaymentLinkCard link={user?.paymentLink || "/pay/artisan"} name={user?.fullName || "Artisan"} />
-          {/* <div className="rounded-xl border p-5" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+          <div className="rounded-xl border p-5" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
             <div className="mb-3 flex items-center justify-between">
               <h3 style={{ fontFamily: "var(--font-syne)", fontSize: 18, fontWeight: 700 }}>Generate Invoice</h3>
             </div>
@@ -535,7 +535,7 @@ export default function DashboardPage() {
                 </div>
               ) : null}
             </div>
-          </div> */}
+          </div>
         </div>
       </div>
     </motion.div>

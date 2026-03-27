@@ -50,6 +50,13 @@ export default function InvoicePayPage() {
         return Math.max(0, kobo / 100);
     }, [invoice?.amount_kobo]);
 
+    const invoiceAmountLabel = useMemo(() => formatNaira(amountNaira), [amountNaira]);
+
+    const isInvoicePaid = useMemo(() => {
+        const s = (invoice?.status || "").toString().trim().toLowerCase();
+        return s === "paid" || s === "completed" || s === "success";
+    }, [invoice?.status]);
+
     useEffect(() => {
         const loadProfile = async () => {
             try {
@@ -154,6 +161,10 @@ export default function InvoicePayPage() {
 
     const handlePay = async () => {
         if (!invoice) return;
+        if (isInvoicePaid) {
+            setPaymentError("This invoice has already been paid.");
+            return;
+        }
         setPaymentError(null);
 
         if (
@@ -183,7 +194,7 @@ export default function InvoicePayPage() {
                 amount: amountInKobo,
                 currency: 566,
                 site_redirect_url: window.location.href,
-                cust_email: "client@craftid.ng",
+                cust_email: invoice.customer_email || "client@craftid.ng",
                 cust_name: invoice.customer_name || "Client",
                 pay_item_name: invoice.description || `Invoice ${invoice.reference}`,
                 mode: process.env.NEXT_PUBLIC_ISW_MODE,
@@ -284,7 +295,7 @@ export default function InvoicePayPage() {
             </header>
 
             <div className="mx-auto w-full max-w-130 px-4 py-8">
-                {!success ? (
+                {!success && !isInvoicePaid ? (
                     <>
                         <div
                             className="rounded-2xl border bg-white p-6"
@@ -311,6 +322,45 @@ export default function InvoicePayPage() {
 
                         <div className="mt-3 rounded-2xl border bg-white p-6" style={{ borderColor: "#E2E8F0" }}>
                             <h2 style={{ fontFamily: "var(--font-syne)", fontWeight: 700, fontSize: 18 }}>Pay this invoice</h2>
+
+                            <div className="mt-4 grid gap-3">
+                                <div>
+                                    <label className="text-xs" style={{ color: "#64748B" }}>Client name</label>
+                                    <input
+                                        value={invoice.customer_name || ""}
+                                        readOnly
+                                        className="mt-1 w-full rounded-xl border px-3 py-3 text-sm"
+                                        style={{ borderColor: "#E2E8F0", background: "#F1F5F9", color: "#0F172A" }}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs" style={{ color: "#64748B" }}>Client email</label>
+                                    <input
+                                        value={invoice.customer_email || ""}
+                                        readOnly
+                                        className="mt-1 w-full rounded-xl border px-3 py-3 text-sm"
+                                        style={{ borderColor: "#E2E8F0", background: "#F1F5F9", color: "#0F172A" }}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs" style={{ color: "#64748B" }}>Description</label>
+                                    <input
+                                        value={invoice.description || `Invoice ${invoice.reference}`}
+                                        readOnly
+                                        className="mt-1 w-full rounded-xl border px-3 py-3 text-sm"
+                                        style={{ borderColor: "#E2E8F0", background: "#F1F5F9", color: "#0F172A" }}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs" style={{ color: "#64748B" }}>Amount</label>
+                                    <input
+                                        value={invoiceAmountLabel}
+                                        readOnly
+                                        className="mt-1 w-full rounded-xl border px-3 py-3 text-sm"
+                                        style={{ borderColor: "#E2E8F0", background: "#F1F5F9", color: "#0F172A", fontFamily: "var(--font-dm-mono)", fontWeight: 800 }}
+                                    />
+                                </div>
+                            </div>
 
                             <button
                                 onClick={handlePay}
@@ -348,8 +398,14 @@ export default function InvoicePayPage() {
                         >
                             <CheckCircle2 size={42} />
                         </motion.div>
-                        <h2 style={{ fontFamily: "var(--font-syne)", fontSize: 34, fontWeight: 800 }}>Payment Sent!</h2>
-                        <p style={{ color: "#64748B", marginTop: 6 }}>You paid {formatNaira(amountNaira)} to {artisanName}</p>
+                        <h2 style={{ fontFamily: "var(--font-syne)", fontSize: 34, fontWeight: 800 }}>
+                            {success ? "Payment Sent!" : "Invoice Paid"}
+                        </h2>
+                        <p style={{ color: "#64748B", marginTop: 6 }}>
+                            {success
+                                ? `You paid ${formatNaira(amountNaira)} to ${artisanName}`
+                                : `This invoice for ${formatNaira(amountNaira)} has already been paid.`}
+                        </p>
                         <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-white px-3 py-2 text-xs" style={{ color: "#64748B" }}>
                             <Shield size={12} />Secured by Interswitch
                         </span>
