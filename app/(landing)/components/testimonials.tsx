@@ -7,14 +7,14 @@ const testimonials = [
     name: "Amaka Okonkwo",
     meta: "Tailor · Surulere",
     score: "789",
-    quote: "I got ₦150,000 to buy my industrial sewing machine. Carbon rejected me three times. CraftID approved me in two hours.",
+    quote: "My clients pay me through my link now, and my CraftScore finally reflects the work I do. The income verification PDF makes me look bank-ready.",
     avatar: "https://i.pravatar.cc/150?u=amaka-okonkwo",
   },
   {
     name: "Emeka Daniel",
     meta: "Carpenter · Aba",
     score: "812",
-    quote: "My CraftScore is 812. I didn't fill any form — it built itself as I worked. Now I have a business account.",
+    quote: "My CraftScore is 812. I didn’t fill any form — it built itself as I worked. Now I can show a clean payment history anytime.",
     avatar: "https://i.pravatar.cc/150?u=chukwuemeka-duru",
   },
   {
@@ -32,7 +32,7 @@ export function Testimonials() {
       <div className="absolute inset-0 w-screen left-1/2 -translate-x-1/2 -z-10" style={{ background: "var(--surface)" }} />
       <div className="mx-auto w-full max-w-350">
         <h2 className="text-center max-xl:leading-13 text-[44px] max-sm:text-[30px] max-sm:leading-10" style={{ fontFamily: "var(--font-syne)", fontWeight: 800 }}>
-          Real artisans. <br className="hidden max-xl:flex"/> <span style={{ background: "linear-gradient(135deg,#F97316,#7C3AED)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Real results.</span>
+          Real artisans. <br className="hidden max-xl:flex" /> <span style={{ background: "linear-gradient(135deg,#F97316,#7C3AED)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Real results.</span>
         </h2>
         <div className="mt-10 xl:mt-12 grid grid-cols-1 gap-6 lg:grid-cols-3">
           {testimonials.map((t, i) => (
@@ -49,7 +49,7 @@ export function Testimonials() {
                   {t.score}
                 </span>
               </div>
-              <p className="mt-5 text-[14px] xl:text-[16px]" style={{ color: "var(--text-2)",lineHeight: 1.8, fontStyle: "italic" }}>
+              <p className="mt-5 text-[14px] xl:text-[16px]" style={{ color: "var(--text-2)", lineHeight: 1.8, fontStyle: "italic" }}>
                 “{t.quote}”
               </p>
               <p className="mt-4 font-extralight" style={{ color: "var(--orange)" }}>★★★★★</p>

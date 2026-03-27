@@ -5,7 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 
 import { StatsCard } from "@/components/stats-card";
 import { useUser } from "@/lib/useUser";
-import { formatNaira } from "@/lib/utils";
+import { formatNaira, getAppOrigin } from "@/lib/utils";
 
 type DbInvoice = {
     id: string;
@@ -153,10 +153,7 @@ export default function PaymentsInvoicesPage() {
     const invoicesTotal = useMemo(() => invoices.reduce((sum, inv) => sum + (inv.amount_kobo || 0), 0), [invoices]);
     const paymentsTotal = useMemo(() => payments.reduce((sum, p) => sum + (p.amount_kobo || 0), 0), [payments]);
 
-    const origin = useMemo(() => {
-        if (typeof window === "undefined") return "";
-        return window.location.origin;
-    }, []);
+    const origin = useMemo(() => getAppOrigin(), []);
 
     return (
         <div className="space-y-8">
@@ -197,75 +194,7 @@ export default function PaymentsInvoicesPage() {
 
             {tab === "invoices" ? (
                 <div className="space-y-6">
-                    <div className="rounded-lg border bg-card p-6">
-                        <h2 className="text-lg font-semibold">Create invoice</h2>
-                        <div className="mt-4 grid gap-4 md:grid-cols-2">
-                            <div>
-                                <label className="text-sm font-medium text-foreground">Amount (₦)</label>
-                                <input
-                                    type="number"
-                                    min={1}
-                                    inputMode="decimal"
-                                    value={amountNgn}
-                                    onChange={(e) => setAmountNgn(e.target.value)}
-                                    className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground"
-                                    placeholder="5000"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-foreground">Customer name</label>
-                                <input
-                                    type="text"
-                                    value={customerName}
-                                    onChange={(e) => setCustomerName(e.target.value)}
-                                    className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground"
-                                    placeholder="John Doe"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-foreground">Customer email</label>
-                                <input
-                                    type="email"
-                                    value={customerEmail}
-                                    onChange={(e) => setCustomerEmail(e.target.value)}
-                                    className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground"
-                                    placeholder="john@example.com"
-                                />
-                                {customerEmail.length > 0 && !isValidEmail(customerEmail) ? (
-                                    <p className="mt-1 text-xs text-destructive">Enter a valid email address.</p>
-                                ) : null}
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-foreground">Description (optional)</label>
-                                <input
-                                    type="text"
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground"
-                                    placeholder="Work done"
-                                />
-                            </div>
-                        </div>
-
-                        {createError ? <p className="mt-3 text-sm text-destructive">{createError}</p> : null}
-
-                        <div className="mt-4">
-                            <button
-                                type="button"
-                                onClick={onCreateInvoice}
-                                disabled={!canCreate}
-                                className={
-                                    canCreate
-                                        ? "rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-                                        : "cursor-not-allowed rounded-md bg-muted px-4 py-2 text-sm font-medium text-muted-foreground"
-                                }
-                            >
-                                {creating ? "Creating…" : "Create invoice"}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="rounded-lg border bg-card p-6">
+                    <div className="rounded-lg border bg-card p-6" style={{ borderColor: "var(--border)" }}>
                         <div className="flex items-center justify-between gap-3">
                             <h2 className="text-lg font-semibold">Invoices</h2>
                             <button
@@ -287,7 +216,11 @@ export default function PaymentsInvoicesPage() {
                                 <p className="text-sm text-muted-foreground">No invoices yet.</p>
                             ) : (
                                 invoices.map((inv) => (
-                                    <div key={inv.id} className="rounded-md border bg-background p-4">
+                                    <div
+                                        key={inv.id}
+                                        className="rounded-md border bg-background p-4"
+                                        style={{ borderColor: "var(--border)" }}
+                                    >
                                         <div className="flex flex-wrap items-center justify-between gap-2">
                                             <p className="text-sm font-medium text-foreground">{inv.customer_name}</p>
                                             <p className="text-sm font-semibold text-foreground">{formatNaira(inv.amount_kobo / 100)}</p>
@@ -303,9 +236,12 @@ export default function PaymentsInvoicesPage() {
                                             >
                                                 {origin ? `${origin}/pay/${artisanSlug}/${inv.reference}` : `/pay/${artisanSlug}/${inv.reference}`}
                                             </a>
-                                            <div className="rounded-md p-2" style={{ background: "white" }}>
+                                            <div
+                                                className="rounded-md border bg-background p-2"
+                                                style={{ borderColor: "var(--border)" }}
+                                            >
                                                 <QRCodeSVG
-                                                    value={origin ? `${origin}/pay/${artisanSlug}/${inv.reference}` : `https://craftid.ng/pay/${artisanSlug}/${inv.reference}`}
+                                                    value={origin ? `${origin}/pay/${artisanSlug}/${inv.reference}` : `/pay/${artisanSlug}/${inv.reference}`}
                                                     size={72}
                                                     fgColor="#09090E"
                                                     bgColor="#FFFFFF"
@@ -324,7 +260,7 @@ export default function PaymentsInvoicesPage() {
                     </div>
                 </div>
             ) : (
-                <div className="rounded-lg border bg-card p-6">
+                <div className="rounded-lg border bg-card p-6" style={{ borderColor: "var(--border)" }}>
                     <div className="flex items-center justify-between gap-3">
                         <h2 className="text-lg font-semibold">Completed payments</h2>
                         <button
@@ -346,7 +282,11 @@ export default function PaymentsInvoicesPage() {
                             <p className="text-sm text-muted-foreground">No completed payments yet.</p>
                         ) : (
                             payments.map((p) => (
-                                <div key={p.id} className="rounded-md border bg-background p-4">
+                                <div
+                                    key={p.id}
+                                    className="rounded-md border bg-background p-4"
+                                    style={{ borderColor: "var(--border)" }}
+                                >
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <p className="text-sm font-medium text-foreground">{p.txn_ref}</p>
                                         <p className="text-sm font-semibold text-foreground">{formatNaira(p.amount_kobo / 100)}</p>

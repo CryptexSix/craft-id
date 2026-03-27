@@ -19,8 +19,8 @@ const steps = [
   {
     no: "03",
     icon: TrendingUp,
-    title: "Unlock Credit",
-    description: "After 60 days, your CraftScore unlocks a nano loan up to ₦500,000 and a virtual Verve card. No application form.",
+    title: "Generate Proof of Income",
+    description: "As payments come in, your CraftScore grows and you can generate an income verification PDF for loans, rentals, and supplier credit.",
   },
 ];
 

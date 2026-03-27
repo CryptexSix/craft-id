@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
-import { CheckCircle2, Lock, Zap } from "lucide-react";
+import { CheckCircle2, Zap } from "lucide-react";
 import { CraftScoreGauge } from "@/components/craft-score-gauge";
 import { formatNaira, MAX_CRAFT_SCORE } from "@/lib/utils";
 import { useUser } from "@/lib/useUser";
@@ -63,18 +63,10 @@ export default function ScorePage() {
   const [bvnVerifying, setBvnVerifying] = useState(false);
   const [bvnError, setBvnError] = useState<string | null>(null);
   const [craftScore, setCraftScore] = useState(0);
-  const [scoreLevel, setScoreLevel] = useState("Building");
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ count: 0, volume: 0 });
   const [accountAgeDays, setAccountAgeDays] = useState(0);
   const hasPayments = stats.count > 0 || stats.volume > 0;
-
-  const tiers = [
-    [200, "Virtual Verve Card", "Spend on tools and materials"],
-    [350, "Nano Loan ₦150,000", "Equipment financing in 2 hours"],
-    [500, "Business Account", "Full business banking"],
-    [650, "Premium Lending ₦1M", "Grow your business further"],
-  ] as const;
 
   useEffect(() => {
     const loadData = async () => {
@@ -227,7 +219,6 @@ export default function ScorePage() {
 
         const scoreData = await scoreRes.json();
         setCraftScore(scoreData.score);
-        setScoreLevel(scoreData.level);
       } catch (err) {
         console.error("Error calculating score:", err);
       } finally {
@@ -310,15 +301,21 @@ export default function ScorePage() {
     },
   ];
 
-  const nextMilestone = () => {
-    if (craftScore < 200) return { pointsNeeded: 200 - craftScore, message: "to unlock Virtual Card" };
-    if (craftScore < 350) return { pointsNeeded: 350 - craftScore, message: "to unlock Nano Loan" };
-    if (craftScore < 500) return { pointsNeeded: 500 - craftScore, message: "to unlock Business Account" };
-    if (craftScore < 650) return { pointsNeeded: 650 - craftScore, message: "to unlock Premium Lending" };
-    return { pointsNeeded: 0, message: "Maximum level reached!" };
-  };
+  const statusMessage = (() => {
+    if (!hasPayments) {
+      return bvnVerified
+        ? "Identity verified · receive your first payment to start building your CraftScore."
+        : "Receive your first payment (or verify BVN) to start building your CraftScore.";
+    }
 
-  const milestone = nextMilestone();
+    if (craftScore >= 350) {
+      return bvnVerified
+        ? "Eligible · Generate your income verification PDF and view your loan offer."
+        : "Verify BVN to unlock loans and income verification PDF.";
+    }
+
+    return `${Math.max(0, 350 - craftScore)} more points to reach loan eligibility.`;
+  })();
 
   if (loading || userLoading) {
     return (
@@ -387,7 +384,7 @@ export default function ScorePage() {
         <div>
           <CraftScoreGauge size="lg" score={craftScore} />
           <p className="mt-3 text-center" style={{ color: "var(--text-2)", fontSize: 12 }}>
-            {milestone.pointsNeeded > 0 ? `${milestone.pointsNeeded} more points ${milestone.message}` : scoreLevel}
+            {statusMessage}
           </p>
           <div className="mx-auto mt-2 max-w-65 rounded-full px-3 py-2 text-center text-xs" style={{ border: "1px solid var(--border)", background: "var(--surface)" }}>
             Day {Math.min(accountAgeDays, 60)} of 60
@@ -455,35 +452,8 @@ export default function ScorePage() {
         )}
       </section>
 
-      <section>
-        <h3 style={{ fontFamily: "var(--font-syne)", fontSize: 22, fontWeight: 700 }}>What your score unlocks</h3>
-        <div className="mt-3 space-y-3">
-          {tiers.map(([threshold, title, description]) => {
-            const unlocked = craftScore >= threshold;
-            const needed = threshold - craftScore;
-            return (
-              <div key={title} className="flex items-center justify-between rounded-xl border p-4" style={{ background: unlocked ? "var(--green-dim)" : "var(--surface)", borderColor: unlocked ? "rgba(22,163,74,0.25)" : "var(--border)" }}>
-                <div className="flex items-center gap-3">
-                  {unlocked ? <CheckCircle2 size={18} style={{ color: "var(--green)" }} /> : <Lock size={18} style={{ color: "var(--text-3)" }} />}
-                  <div>
-                    <p style={{ color: unlocked ? "var(--text-1)" : "var(--text-2)", fontWeight: 600 }}>{title}</p>
-                    <p style={{ color: "var(--text-2)", fontSize: 12 }}>{description}</p>
-                  </div>
-                </div>
-                <div>
-                  {unlocked ?
-                    <span style={{ color: "var(--green)", fontSize: 13 }}>✓ Unlocked</span> :
-                    <span style={{ color: "var(--text-2)", fontSize: 13 }}>+{needed} points needed</span>
-                  }
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
       <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        {["Keep your account active over time", "Ask happy clients to pay through your link", "Keep job descriptions detailed for better insights"].map((tip) => (
+        {["Verify BVN when you’re ready (boosts your score)", "Ask clients to pay through your CraftID link", "Keep receiving payments consistently to grow your score"].map((tip) => (
           <motion.div key={tip} whileHover={{ y: -3 }} className="rounded-lg border p-4" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
             <p className="mb-1" style={{ color: "var(--orange)" }}><Zap size={15} /></p>
             <p style={{ color: "var(--text-2)", fontSize: 13 }}>{tip}</p>
@@ -492,8 +462,7 @@ export default function ScorePage() {
       </section>
 
       <section className="flex flex-wrap gap-3">
-        <a href="/loan" className="inline-flex rounded-xl px-5 py-3" style={{ background: "var(--orange)", color: "white" }}>View Loan Offer →</a>
-        <a href="/card" className="inline-flex rounded-xl border px-5 py-3" style={{ borderColor: "var(--border-light)", color: "var(--text-1)" }}>View My Card</a>
+        <a href="/report" className="inline-flex rounded-xl px-5 py-3" style={{ background: "var(--orange)", color: "white" }}>Income Verification PDF →</a>
       </section>
     </motion.div>
   );

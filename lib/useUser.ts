@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 export interface UserProfile {
   firstName: string;
   fullName: string;
+  email: string;
   phone: string;
   state: string;
   skill: string;

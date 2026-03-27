@@ -36,6 +36,11 @@ export async function GET(
     return NextResponse.json({ invoice });
   }
 
+  // Only Interswitch-backed invoices can be refreshed from a provider.
+  if ((invoice as any)?.provider !== "interswitch") {
+    return NextResponse.json({ invoice });
+  }
+
   let provider: any;
   try {
     provider = await getInvoice(invoiceRef);

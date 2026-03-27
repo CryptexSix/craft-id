@@ -357,7 +357,7 @@ export default function PublicPayPage() {
                 {artisanName}
               </h1>
               <p className="mt-1 flex items-center gap-2" style={{ color: "#64748B", fontSize: 13 }}>
-                🔧 {artisanSkill} <MapPin size={13} /> {artisanState}
+                {artisanSkill} <MapPin size={13} /> {artisanState}
               </p>
               <p className="mt-1" style={{ color: "#F97316", fontSize: 13 }}>
                 ★★★★☆ 4.8

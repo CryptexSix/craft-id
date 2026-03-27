@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Check, Copy, MessageCircle } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import { getAppOrigin } from "@/lib/utils";
 
 type PaymentLinkCardProps = {
   link: string;
@@ -18,10 +19,8 @@ export function PaymentLinkCard({ link, name }: PaymentLinkCardProps) {
     }
 
     if (link.startsWith("/")) {
-      if (typeof window !== "undefined") {
-        return `${window.location.origin}${link}`;
-      }
-      return `https://craftid.ng${link}`;
+      const origin = getAppOrigin();
+      return origin ? `${origin}${link}` : link;
     }
 
     return `https://${link}`;
