@@ -1,33 +1,136 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronLeft, Shield, UserCircle2 } from "lucide-react";
+import { Check, ChevronLeft, Info, UserCircle2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useMemo, useState } from "react";
 
-const states = ["Abia","Adamawa","Akwa Ibom","Anambra","Bauchi","Bayelsa","Benue","Borno","Cross River","Delta","Ebonyi","Edo","Ekiti","Enugu","FCT","Gombe","Imo","Jigawa","Kaduna","Kano","Katsina","Kebbi","Kogi","Kwara","Lagos","Nasarawa","Niger","Ogun","Ondo","Osun","Oyo","Plateau","Rivers","Sokoto","Taraba","Yobe","Zamfara"];
+const states = ["Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"];
 const skills = ["✂️ Tailor", "🔧 Mechanic", "🪑 Carpenter", "⚡ Welder", "💇 Hairdresser", "🪠 Plumber", "🧱 Tiler", "🎨 Painter", "➕ Other"];
+
+function getRateHints(skill: string) {
+  const normalized = (skill || "").toLowerCase();
+
+  if (normalized.includes("mechanic")) {
+    return {
+      min: "Minimum: small fixes (e.g., replace spark plugs)",
+      avg: "Average: routine work (e.g., service an engine)",
+      premium: "Premium: major work (e.g., replace an engine)",
+    };
+  }
+
+  if (normalized.includes("tailor")) {
+    return {
+      min: "Minimum: adjustments (e.g., shorten trousers)",
+      avg: "Average: regular sewing (e.g., sew a native outfit)",
+      premium: "Premium: complex jobs (e.g., wedding/bridal outfit)",
+    };
+  }
+
+  if (normalized.includes("carpenter")) {
+    return {
+      min: "Minimum: simple jobs (e.g., shelf installation)",
+      avg: "Average: standard jobs (e.g., kitchen cabinet)",
+      premium: "Premium: major jobs (e.g., full wardrobe/doors)",
+    };
+  }
+
+  if (normalized.includes("hair")) {
+    return {
+      min: "Minimum: quick styling (e.g., simple braid)",
+      avg: "Average: regular styling (e.g., weave installation)",
+      premium: "Premium: special styling (e.g., bridal styling)",
+    };
+  }
+
+  if (normalized.includes("plumber")) {
+    return {
+      min: "Minimum: quick repairs (e.g., fix a leak)",
+      avg: "Average: standard jobs (e.g., install a sink/toilet)",
+      premium: "Premium: major work (e.g., full re-piping)",
+    };
+  }
+
+  if (normalized.includes("welder")) {
+    return {
+      min: "Minimum: small welding (e.g., gate handle fix)",
+      avg: "Average: standard welding (e.g., window burglary bars)",
+      premium: "Premium: heavy fabrication (e.g., full gate/railing)",
+    };
+  }
+
+  if (normalized.includes("painter")) {
+    return {
+      min: "Minimum: touch-up work (e.g., small wall patch)",
+      avg: "Average: standard painting (e.g., 1 room)",
+      premium: "Premium: major painting (e.g., whole apartment)",
+    };
+  }
+
+  if (normalized.includes("tiler")) {
+    return {
+      min: "Minimum: small fixes (e.g., replace a broken tile)",
+      avg: "Average: standard tiling (e.g., bathroom floor)",
+      premium: "Premium: major tiling (e.g., full kitchen + living room)",
+    };
+  }
+
+  return {
+    min: "Minimum: small job",
+    avg: "Average: normal job",
+    premium: "Premium: big job",
+  };
+}
+
+function Hint({ text }: { text: string }) {
+  const [pinned, setPinned] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const open = pinned || hovered;
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <button
+        type="button"
+        aria-label="Hint"
+        onClick={() => setPinned((v) => !v)}
+        className="grid h-6 w-6 place-items-center rounded-full border"
+        style={{ borderColor: "var(--border)", color: "var(--text-2)", background: "var(--surface)" }}
+      >
+        <Info size={14} />
+      </button>
+      {open ? (
+        <div
+          className="absolute right-0 top-7 z-10 w-64 rounded-xl border px-3 py-2 text-xs"
+          style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text-2)" }}
+        >
+          {text}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [fullPaymentUrl, setFullPaymentUrl] = useState("");
   const [copied, setCopied] = useState(false);
-  const [bvnVerifying, setBvnVerifying] = useState(false);
-  const [bvnVerified, setBvnVerified] = useState(false);
-  const [bvnError, setBvnError] = useState<string | null>(null);
-  const [verifiedName, setVerifiedName] = useState<string>("");
-  const [form, setForm] = useState({ fullName: "", phone: "", state: "", skill: "✂️ Tailor", experience: 6, minJob: "", avgJob: "", premiumJob: "", bio: "", bvn: "", nin: "", agree: false });
+  const [form, setForm] = useState({ fullName: "", phone: "", state: "", skill: "✂️ Tailor", otherSkill: "", experience: 6, minJob: "", avgJob: "", premiumJob: "", bio: "" });
 
   const valid = useMemo(() => {
     if (step === 1) return !!(form.fullName && form.phone && form.state);
-    if (step === 2) return !!form.skill;
+    if (step === 2) return !!form.skill && (form.skill !== "➕ Other" || !!form.otherSkill.trim());
     if (step === 3) return !!(form.minJob && form.avgJob);
-    return form.bvn.length === 11 && form.agree && bvnVerified;
-  }, [form, step, bvnVerified]);
+    return false;
+  }, [form, step]);
 
-  const progress = (step / 4) * 100;
+  const progress = (step / 3) * 100;
   const firstName = form.fullName.split(" ")[0] || "Emeka";
   const slug = (form.fullName || "artisan").toLowerCase().replace(/\s+/g, "-");
   const resolvedPaymentUrl =
@@ -64,75 +167,67 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleVerifyBVN = async () => {
-    if (form.bvn.length !== 11) {
-      setBvnError("BVN must be 11 digits");
-      return;
-    }
-    
-    setBvnVerifying(true);
-    setBvnError(null);
-    
-    try {
-      const res = await fetch("/api/verify-bvn", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bvn: form.bvn }),
-      });
-      
-      const data = await res.json();
-      
-      if (data.verified) {
-        setBvnVerified(true);
-        setVerifiedName(data.firstName || "");
-        if (!form.fullName && data.firstName) {
-          setForm(f => ({ ...f, fullName: `${data.firstName} ${data.lastName || ""}`.trim() }));
-        }
-      } else {
-        setBvnError("BVN could not be verified. Please check and try again.");
-        setBvnVerified(false);
-      }
-    } catch (err) {
-      console.error("BVN verification error:", err);
-      setBvnError("Verification failed. Please try again.");
-      setBvnVerified(false);
-    } finally {
-      setBvnVerifying(false);
-    }
-  };
-
   const handleContinue = async () => {
     if (!valid) return;
-    if (step < 4) return setStep((s) => s + 1);
+    if (step < 3) return setStep((s) => s + 1);
     setLoading(true);
+    setCreateError(null);
     await new Promise((r) => setTimeout(r, 800));
 
     const generatedSlug = (form.fullName || "artisan").toLowerCase().replace(/\s+/g, "-");
     const generatedPaymentLink = `/pay/${generatedSlug}`;
     const generatedFullPaymentUrl = `${window.location.origin}${generatedPaymentLink}`;
 
+    const resolvedSkill = form.skill === "➕ Other" ? form.otherSkill.trim() : form.skill;
+
     const userProfile = {
       firstName: form.fullName.split(" ")[0],
       fullName: form.fullName,
       phone: form.phone,
       state: form.state,
-      skill: form.skill,
+      skill: resolvedSkill,
       experience: form.experience,
       minJob: form.minJob,
       avgJob: form.avgJob,
       premiumJob: form.premiumJob,
       bio: form.bio,
-      bvn: form.bvn,
-      nin: form.nin,
-      bvnVerified: bvnVerified,
-      bvnName: verifiedName,
+      bvn: "",
+      nin: "",
+      bvnVerified: false,
+      bvnName: "",
       slug: generatedSlug,
       paymentLink: generatedPaymentLink,
       createdAt: new Date().toISOString(),
     };
 
-    localStorage.setItem("craftid_user", JSON.stringify(userProfile));
-    localStorage.setItem("craftid_bvn_verified", String(bvnVerified));
+    try {
+      const res = await fetch("/api/users/upsert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(userProfile),
+      });
+
+      if (!res.ok) {
+        let msg = "Could not create your CraftID right now. Please try again.";
+        try {
+          const body = (await res.json()) as { error?: string };
+          if (body?.error) msg = body.error;
+        } catch {
+          // ignore
+        }
+        setCreateError(msg);
+        setLoading(false);
+        return;
+      }
+
+      localStorage.setItem("craftid_user", JSON.stringify(userProfile));
+      localStorage.setItem("craftid_bvn_verified", "false");
+    } catch (err) {
+      console.error("[CraftID] Failed to persist profile to DB:", err);
+      setCreateError("Network/DB error: could not create your CraftID. Please try again.");
+      setLoading(false);
+      return;
+    }
 
     setLoading(false);
     setFullPaymentUrl(generatedFullPaymentUrl);
@@ -147,22 +242,25 @@ export default function OnboardingPage() {
           <>
             <div className="mb-8 flex items-center justify-between">
               {step > 1 ? <button onClick={() => setStep((s) => Math.max(1, s - 1))} className="grid h-9 w-9 place-items-center rounded-full border" style={{ borderColor: "var(--border)", color: "var(--text-2)" }}><ChevronLeft size={18} /></button> : <span />}
-              <span style={{ color: "var(--text-2)", fontSize: 13 }}>{step} of 4</span>
+              <span style={{ color: "var(--text-2)", fontSize: 13 }}>{step} of 3</span>
             </div>
 
             <AnimatePresence mode="wait">
               <motion.div key={step} initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} transition={{ duration: 0.25 }}>
                 {step === 1 && <div><UserCircle2 size={48} style={{ color: "var(--orange)", marginBottom: 14 }} /><h1 style={{ fontFamily: "var(--font-syne)", fontSize: 32, fontWeight: 700 }}>Who are you?</h1><p style={{ color: "var(--text-2)", marginTop: 6 }}>Let&apos;s set up your professional identity</p><div className="mt-7 space-y-4">{[["Full name", "fullName", "Emeka Okafor"], ["Phone", "phone", "0812 345 6789"]].map(([label, key, placeholder]) => <div key={key}><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>{label}</label><input className="w-full rounded-xl px-4 py-3.5" value={form[key as keyof typeof form] as string} placeholder={placeholder} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} /></div>)}<div><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>State</label><select className="w-full rounded-xl px-4 py-3.5" value={form.state} onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}><option value="">Select your state</option>{states.map((s) => <option key={s}>{s}</option>)}</select></div></div></div>}
 
-                {step === 2 && <div><h1 style={{ fontFamily: "var(--font-syne)", fontSize: 32, fontWeight: 700 }}>What&apos;s your craft?</h1><p style={{ color: "var(--text-2)", marginTop: 6 }}>Choose your primary skill</p><div className="mt-7 grid grid-cols-3 gap-3">{skills.map((skill) => {const active = form.skill === skill; const [emoji, ...rest] = skill.split(" "); return <button key={skill} onClick={() => setForm((f) => ({ ...f, skill }))} className="flex flex-col items-center gap-2 rounded-2xl px-2 py-4" style={{ background: active ? "var(--orange-dim)" : "var(--surface)", border: `1px solid ${active ? "var(--orange)" : "var(--border)"}`, boxShadow: active ? "0 0 0 3px var(--orange-dim)" : "none" }}><span style={{ fontSize: 28 }}>{emoji}</span><span style={{ color: active ? "var(--orange)" : "var(--text-2)", fontSize: 12 }}>{rest.join(" ")}</span>{active ? <span className="h-2 w-2 rounded-full" style={{ background: "var(--orange)" }} /> : null}</button>;})}</div><div className="mt-6"><label style={{ color: "var(--text-2)", fontSize: 14 }}>Years of experience: <span style={{ color: "var(--orange)", fontWeight: 600 }}>{form.experience} years</span></label><input type="range" min={1} max={25} className="mt-3 w-full" style={{ accentColor: "var(--orange)" }} value={form.experience} onChange={(e) => setForm((f) => ({ ...f, experience: Number(e.target.value) }))} /></div></div>}
+                {step === 2 && <div><h1 style={{ fontFamily: "var(--font-syne)", fontSize: 32, fontWeight: 700 }}>What&apos;s your craft?</h1><p style={{ color: "var(--text-2)", marginTop: 6 }}>Choose your primary skill</p><div className="mt-7 grid grid-cols-3 gap-3">{skills.map((skill) => { const active = form.skill === skill; const [emoji, ...rest] = skill.split(" "); return <button key={skill} onClick={() => setForm((f) => ({ ...f, skill }))} className="flex flex-col items-center gap-2 rounded-2xl px-2 py-4" style={{ background: active ? "var(--orange-dim)" : "var(--surface)", border: `1px solid ${active ? "var(--orange)" : "var(--border)"}`, boxShadow: active ? "0 0 0 3px var(--orange-dim)" : "none" }}><span style={{ fontSize: 28 }}>{emoji}</span><span style={{ color: active ? "var(--orange)" : "var(--text-2)", fontSize: 12 }}>{rest.join(" ")}</span>{active ? <span className="h-2 w-2 rounded-full" style={{ background: "var(--orange)" }} /> : null}</button>; })}</div>{form.skill === "➕ Other" ? (<div className="mt-5"><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>Your craft</label><input className="w-full rounded-xl px-4 py-3.5" value={form.otherSkill} placeholder="e.g. Electrician" onChange={(e) => setForm((f) => ({ ...f, otherSkill: e.target.value }))} /></div>) : null}<div className="mt-6"><label style={{ color: "var(--text-2)", fontSize: 14 }}>Years of experience</label><div className="mt-2 grid grid-cols-2 gap-3"><select className="w-full rounded-xl px-4 py-3.5" value={String(form.experience)} onChange={(e) => setForm((f) => ({ ...f, experience: Number(e.target.value) }))}><option value="">Select</option>{Array.from({ length: 25 }, (_, i) => i + 1).map((y) => <option key={y} value={y}>{y} year{y === 1 ? "" : "s"}</option>)}</select><input type="number" min={0} max={60} className="w-full rounded-xl px-4 py-3.5" value={String(form.experience)} onChange={(e) => { const next = Number(e.target.value); setForm((f) => ({ ...f, experience: Number.isFinite(next) ? next : 0 })); }} /></div><p className="mt-2 text-xs" style={{ color: "var(--text-2)" }}>Use the dropdown or type a number.</p></div></div>}
 
-                {step === 3 && <div><h1 style={{ fontFamily: "var(--font-syne)", fontSize: 32, fontWeight: 700 }}>Set your rates</h1><p style={{ color: "var(--text-2)", marginTop: 6 }}>Help clients understand your pricing</p><div className="mt-7 space-y-4">{[["Minimum job (small repair or alteration)", "minJob"], ["Average job", "avgJob"], ["Premium job (optional)", "premiumJob"]].map(([label, key]) => <div key={key}><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>{label}</label><div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: "var(--orange)" }}>₦</span><input className="w-full rounded-xl py-3.5 pl-9 pr-4" value={form[key as keyof typeof form] as string} onChange={(e) => setForm((f) => ({ ...f, [key]: formatMoney(e.target.value) }))} /></div></div>)}<div><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>Bio</label><textarea rows={3} className="w-full resize-none rounded-xl px-4 py-3.5" placeholder="Master tailor with 12 years experience..." value={form.bio} onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))} /></div></div></div>}
-
-                {step === 4 && <div><h1 style={{ fontFamily: "var(--font-syne)", fontSize: 32, fontWeight: 700 }}>Verify your identity</h1><div className="mt-5 flex items-center gap-2 rounded-xl border px-4 py-3" style={{ background: "var(--orange-dim)", borderColor: "rgba(249,115,22,0.2)" }}><Shield size={16} style={{ color: "var(--orange)" }} /><p style={{ fontSize: 13 }}>Your data is encrypted and secured by Interswitch</p></div><div className="mt-5 space-y-4"><div><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>BVN</label><div className="flex gap-2"><input className="flex-1 rounded-xl px-4 py-3.5" maxLength={11} value={form.bvn} placeholder="Enter 11-digit BVN" onChange={(e) => { setForm((f) => ({ ...f, bvn: e.target.value.replace(/\D/g, "") })); setBvnVerified(false); setBvnError(null); }} /><button onClick={handleVerifyBVN} disabled={bvnVerifying || form.bvn.length !== 11} className="rounded-xl px-4 py-2" style={{ background: form.bvn.length === 11 && !bvnVerifying ? "var(--orange)" : "var(--surface)", color: form.bvn.length === 11 && !bvnVerifying ? "white" : "var(--text-3)" }}>{bvnVerifying ? "..." : "Verify"}</button></div>{bvnVerified && <p className="text-sm" style={{ color: "var(--green)" }}>✓ Verified: {verifiedName}</p>}{bvnError && <p className="text-sm" style={{ color: "var(--red)" }}>{bvnError}</p>}</div><div><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>NIN (optional)</label><input className="w-full rounded-xl px-4 py-3.5" value={form.nin} onChange={(e) => setForm((f) => ({ ...f, nin: e.target.value.replace(/\D/g, "") }))} /></div><button onClick={() => setForm((f) => ({ ...f, agree: !f.agree }))} className="flex items-center gap-3"><span className="grid h-5 w-5 place-items-center rounded border" style={{ borderColor: form.agree ? "var(--orange)" : "var(--border)", background: form.agree ? "var(--orange)" : "transparent" }}>{form.agree ? <Check size={13} style={{ color: "white" }} /> : null}</span><span style={{ color: "var(--text-2)", fontSize: 13 }}>I agree to the <a href="#" style={{ color: "var(--orange)", textDecoration: "underline" }}>Terms</a> and <a href="#" style={{ color: "var(--orange)", textDecoration: "underline" }}>Privacy</a>.</span></button></div></div>}
+                {step === 3 && <div><h1 style={{ fontFamily: "var(--font-syne)", fontSize: 32, fontWeight: 700 }}>Set your rates</h1><p style={{ color: "var(--text-2)", marginTop: 6 }}>Help clients understand your pricing</p><div className="mt-7 space-y-4">{(() => { const resolvedSkill = form.skill === "➕ Other" ? form.otherSkill.trim() : form.skill; const hints = getRateHints(resolvedSkill); const fields: Array<{ key: "minJob" | "avgJob" | "premiumJob"; label: string; hint: string; optional?: boolean; }> = [{ key: "minJob", label: "Minimum job", hint: hints.min }, { key: "avgJob", label: "Average job", hint: hints.avg }, { key: "premiumJob", label: "Premium job (optional)", hint: hints.premium, optional: true },]; return fields.map(({ key, label, hint }) => (<div key={key}><div className="mb-1 flex items-center justify-between"><label className="block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>{label}</label><Hint text={hint} /></div><div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: "var(--orange)" }}>₦</span><input className="w-full rounded-xl py-3.5 pl-9 pr-4" value={form[key as keyof typeof form] as string} onChange={(e) => setForm((f) => ({ ...f, [key]: formatMoney(e.target.value) }))} /></div></div>)); })()}<div><label className="mb-1 block text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--text-2)" }}>Bio</label><textarea rows={3} className="w-full resize-none rounded-xl px-4 py-3.5" placeholder="Master artisan with years of experience..." value={form.bio} onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))} /></div></div></div>}
               </motion.div>
             </AnimatePresence>
 
             <button onClick={handleContinue} disabled={!valid || loading} className="mt-8 w-full rounded-3xl px-4 py-4" style={{ background: valid ? "var(--orange)" : "var(--surface)", color: valid ? "white" : "var(--text-3)", border: valid ? "none" : "1px solid var(--border)", fontFamily: "var(--font-syne)", fontSize: 16, fontWeight: 700 }}>{loading ? "Creating your CraftID..." : "Continue"}</button>
+            {createError ? (
+              <p className="mt-3 text-sm" style={{ color: "var(--red)" }}>
+                {createError}
+              </p>
+            ) : null}
           </>
         ) : (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="pt-10 text-center">
@@ -186,9 +284,9 @@ export default function OnboardingPage() {
               </div>
             </div>
             <div className="mt-6 flex flex-col gap-3">
-              <button 
-                onClick={() => window.open(resolvedPaymentUrl, '_blank')} 
-                className="inline-flex items-center justify-center gap-2 rounded-3xl px-6 py-4" 
+              <button
+                onClick={() => window.open(resolvedPaymentUrl, '_blank')}
+                className="inline-flex items-center justify-center gap-2 rounded-3xl px-6 py-4"
                 style={{ background: "var(--orange)", color: "white", fontFamily: "var(--font-syne)", fontWeight: 700 }}
               >
                 <span>🔗</span> Open Payment Page

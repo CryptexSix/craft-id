@@ -2,15 +2,35 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Scissors, Sparkles, Wallet, Settings, CreditCard } from "lucide-react";
+import { Home, Scissors, Sparkles, Wallet, CreditCard } from "lucide-react";
 import { useUser } from "@/lib/useUser";
+
+function NairaIcon({ size = 16 }: { size?: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: size,
+        height: size,
+        fontSize: size,
+        lineHeight: 1,
+        fontWeight: 800,
+      }}
+    >
+      ₦
+    </span>
+  );
+}
 
 export const navItems = [
   { label: "Home", href: "/dashboard", icon: Home },
+  { label: "Payments/Invoices", href: "/dashboard/payments-invoices", icon: NairaIcon },
   { label: "CraftScore", href: "/score", icon: Sparkles },
   { label: "Loans", href: "/loan", icon: Wallet },
   { label: "My Card", href: "/card", icon: CreditCard },
-  { label: "Settings", href: "/onboarding", icon: Settings },
 ];
 
 export function NavSidebar() {

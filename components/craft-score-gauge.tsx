@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { getScoreColor, getScoreLabel } from "@/lib/utils";
+import { getScoreColor, getScoreLabel, MAX_CRAFT_SCORE } from "@/lib/utils";
 
 type GaugeSize = "sm" | "md" | "lg";
 
@@ -50,7 +50,7 @@ export function CraftScoreGauge({ score, size = "md", animate = true }: CraftSco
   const { arcLength, filledLength } = useMemo(() => {
     const circumference = 2 * Math.PI * radius;
     const arc = circumference * 0.75;
-    const fill = (Math.max(0, Math.min(resolvedScore, 1000)) / 1000) * arc;
+    const fill = (Math.max(0, Math.min(resolvedScore, MAX_CRAFT_SCORE)) / MAX_CRAFT_SCORE) * arc;
     return { arcLength: arc, filledLength: fill };
   }, [resolvedScore, radius]);
 
@@ -119,7 +119,7 @@ export function CraftScoreGauge({ score, size = "md", animate = true }: CraftSco
             fontSize: `${Math.max(12, Math.round(fontSize * 0.36))}px`,
           }}
         >
-          /1000
+          points
         </text>
       </svg>
 
