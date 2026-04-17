@@ -182,7 +182,7 @@ export default function ScorePage() {
           await fetch("/api/users/upsert", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ profile: nextUser }),
+            body: JSON.stringify(nextUser),
           });
         } catch (err) {
           console.warn("[CraftID] Could not persist BVN status to DB:", err);
@@ -416,7 +416,7 @@ export default function ScorePage() {
         </div>
       </section>
 
-      <section className="rounded-xl border p-6" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+      {/* <section className="rounded-xl border p-6" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
         <div className="mb-3 flex items-center justify-between">
           <h3 style={{ fontFamily: "var(--font-syne)", fontSize: 20, fontWeight: 700 }}>Score Journey</h3>
           <span className="rounded-full px-3 py-1 text-xs" style={{ background: "var(--green-dim)", color: "var(--green)" }}>
@@ -450,7 +450,7 @@ export default function ScorePage() {
             Your score journey will appear here after you’ve been active for a bit.
           </p>
         )}
-      </section>
+      </section> */}
 
       <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {["Verify BVN when you’re ready (boosts your score)", "Ask clients to pay through your CraftID link", "Keep receiving payments consistently to grow your score"].map((tip) => (

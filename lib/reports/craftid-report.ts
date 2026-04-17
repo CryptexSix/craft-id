@@ -15,7 +15,7 @@ export type CraftData = {
   uniqueClients: number;
   averageTransaction: number;
   highestTransaction: number;
-  craftScore: number; // 0-100
+  craftScore: number; // 0-850
   transactions: {
     date: string;
     clientRef: string;
@@ -48,15 +48,15 @@ function formatNaira(amount: number) {
 }
 
 function scoreLabel(score: number) {
-  if (score >= 75) return "STRONG";
-  if (score >= 55) return "GOOD";
-  if (score >= 40) return "FAIR";
-  return "DEVELOPING";
+  if (score >= 650) return "EXCELLENT";
+  if (score >= 500) return "GOOD STANDING";
+  if (score >= 350) return "FAIR";
+  return "BUILDING";
 }
 
 function scoreBar(score: number) {
   const blocks = 12;
-  const filled = Math.round((clamp(score, 0, 100) / 100) * blocks);
+  const filled = Math.round((clamp(score, 0, 850) / 850) * blocks);
   return "=".repeat(filled) + "-".repeat(blocks - filled);
 }
 
@@ -502,7 +502,7 @@ export async function generateCraftIDReport(craftData: CraftData) {
             width: "*",
             stack: [
               {
-                text: `${clamp(Math.round(craftData.craftScore), 0, 100)} / 100`,
+                text: `${clamp(Math.round(craftData.craftScore), 0, 850)} / 850`,
                 fontSize: 26,
                 bold: true,
                 color: PRIMARY,

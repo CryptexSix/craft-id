@@ -174,7 +174,7 @@ export default function ReportPage() {
         const periodFrom = txs[0]?.date || toISODate(new Date());
         const periodTo = txs[txs.length - 1]?.date || toISODate(new Date());
 
-        const craftScore = Math.round((Math.min(Math.max(craftScore850, 0), 850) / 850) * 100);
+        const craftScore = craftScore850;
 
         return {
             name: user.fullName,
